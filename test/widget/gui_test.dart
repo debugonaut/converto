@@ -71,12 +71,12 @@ void main() {
       find.text('1 files selected · showing compatible tools'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Merge PDF'));
+    await tester.tap(find.text('Watermark'));
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('run-tool'))).onPressed,
-      isNull,
-    );
+    final workspace = tester.widget<ToolWorkspace>(find.byType(ToolWorkspace));
+    expect(workspace.addingFiles, isFalse);
+    expect(workspace.job.busy, isFalse);
+    expect(workspace.job.result, isNull);
     expect(find.text('file with spaces.pdf'), findsOneWidget);
     expect(scratch.listSync().length, 1);
     expect(tester.takeException(), isNull);
@@ -171,6 +171,45 @@ void main() {
     expect(find.byType(ListTile).evaluate().length, lessThan(50));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Run and file removal stay disabled while a drop batch is being read',
+    (tester) async {
+      final job = GuiJobController();
+      addTearDown(job.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: ToolWorkspace(
+              tool: ToolDefinition.byId(ToolId.pdfText),
+              paths: const ['/tmp/input.pdf'],
+              job: job,
+              outputDirectory: '/tmp/results',
+              remember: false,
+              addingFiles: true,
+              onBack: () {},
+              onPick: () async {},
+              onChooseOutput: () async {},
+              onPathsChanged: (_) {},
+              onOpen: (_, {bool reveal = false}) async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('run-tool')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('Adding files…'), findsOneWidget);
+      final remove = find.widgetWithIcon(IconButton, Icons.close);
+      expect(tester.widget<IconButton>(remove).onPressed, isNull);
+      expect(job.busy, isFalse);
+    },
+  );
 
   for (final width in [780.0, 1180.0]) {
     testWidgets(

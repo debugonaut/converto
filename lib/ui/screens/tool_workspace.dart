@@ -14,6 +14,7 @@ class ToolWorkspace extends StatefulWidget {
   final GuiJobController job;
   final String? outputDirectory;
   final bool remember;
+  final bool addingFiles;
   final VoidCallback onBack;
   final Future<void> Function() onPick;
   final Future<void> Function() onChooseOutput;
@@ -26,6 +27,7 @@ class ToolWorkspace extends StatefulWidget {
     required this.job,
     required this.outputDirectory,
     required this.remember,
+    this.addingFiles = false,
     required this.onBack,
     required this.onPick,
     required this.onChooseOutput,
@@ -42,6 +44,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   bool _advancedCrop = false;
   ToolId get _id => widget.tool.id;
   bool get _busy => widget.job.busy;
+  bool get _filesLocked => _busy || widget.addingFiles;
   List<String> get _targets =>
       widget.tool.targets(widget.paths.map(FileUtils.getExtension));
   String get _format =>
@@ -114,7 +117,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     ),
   );
   Future<void> _run() async {
-    if (widget.outputDirectory == null) return;
+    if (widget.outputDirectory == null || widget.addingFiles) return;
     FocusScope.of(context).unfocus();
     final options = <String, Object>{..._values};
     for (final entry in _fields.entries) {
@@ -151,6 +154,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         .where((path) => !widget.tool.accepts(FileUtils.getExtension(path)))
         .length;
     final valid =
+        !widget.addingFiles &&
         widget.paths.isNotEmpty &&
         incompatible == 0 &&
         _targets.isNotEmpty &&
@@ -250,6 +254,8 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                     label: Text(
                       _busy
                           ? 'Processing…'
+                          : widget.addingFiles
+                          ? 'Adding files…'
                           : _id == ToolId.info
                           ? 'Inspect files'
                           : 'Run ${widget.tool.title.toLowerCase()}',
@@ -400,11 +406,11 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
           const Spacer(),
           if (widget.paths.isNotEmpty)
             TextButton(
-              onPressed: _busy ? null : () => widget.onPathsChanged([]),
+              onPressed: _filesLocked ? null : () => widget.onPathsChanged([]),
               child: const Text('Clear'),
             ),
           TextButton.icon(
-            onPressed: _busy ? null : widget.onPick,
+            onPressed: _filesLocked ? null : widget.onPick,
             icon: const Icon(Icons.add, size: 17),
             label: const Text('Add files'),
           ),
@@ -419,7 +425,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: InkWell(
-            onTap: _busy ? null : widget.onPick,
+            onTap: _filesLocked ? null : widget.onPick,
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -480,7 +486,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                     if (_id == ToolId.merge) ...[
                       IconButton(
                         tooltip: 'Move up',
-                        onPressed: _busy || index == 0
+                        onPressed: _filesLocked || index == 0
                             ? null
                             : () {
                                 final paths = List.of(widget.paths);
@@ -492,7 +498,8 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                       ),
                       IconButton(
                         tooltip: 'Move down',
-                        onPressed: _busy || index == widget.paths.length - 1
+                        onPressed:
+                            _filesLocked || index == widget.paths.length - 1
                             ? null
                             : () {
                                 final paths = List.of(widget.paths);
@@ -505,7 +512,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                     ],
                     IconButton(
                       tooltip: 'Remove file',
-                      onPressed: _busy
+                      onPressed: _filesLocked
                           ? null
                           : () {
                               final paths = List.of(widget.paths)

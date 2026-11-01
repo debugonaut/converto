@@ -34,6 +34,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   ToolCategory _category = ToolCategory.all;
   bool _recent = false;
   bool _dragging = false;
+  int _pendingIntakes = 0;
   String _query = '';
   Future<void> _intakeTail = Future.value();
 
@@ -73,7 +74,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Future<void> _intake(Iterable<String> paths) {
+    if (_job.busy || !mounted) return Future.value();
     final batch = paths.toList();
+    setState(() => _pendingIntakes++);
     _intakeTail = _intakeTail
         .then((_) async {
           if (!mounted || _job.busy) return;
@@ -88,6 +91,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
         })
         .catchError((Object error) {
           _notice('Could not add files: $error');
+        })
+        .whenComplete(() {
+          if (mounted) setState(() => _pendingIntakes--);
         });
     return _intakeTail;
   }
@@ -363,6 +369,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                   job: _job,
                                   outputDirectory: _preferences.outputDirectory,
                                   remember: _preferences.rememberHistory,
+                                  addingFiles: _pendingIntakes > 0,
                                   onBack: () => setState(() => _tool = null),
                                   onPick: _pick,
                                   onChooseOutput: _chooseOutput,
@@ -447,7 +454,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Widget _nav(String label, bool selected, VoidCallback action) => TextButton(
-    onPressed: _job.busy ? null : action,
+    onPressed: _job.busy || _pendingIntakes > 0 ? null : action,
     style: TextButton.styleFrom(
       foregroundColor: selected ? AppTheme.amber : AppTheme.muted,
     ),
@@ -523,7 +530,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       ),
                       if (_paths.isNotEmpty)
                         TextButton(
-                          onPressed: () => setState(() => _paths = []),
+                          onPressed: _pendingIntakes > 0
+                              ? null
+                              : () => setState(() => _paths = []),
                           child: const Text('Clear'),
                         ),
                       const SizedBox(width: 12),
@@ -578,12 +587,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           style: TextStyle(color: AppTheme.muted),
                         ),
                         TextButton(
-                          onPressed: () => setState(() {
-                            _query = '';
-                            _search.clear();
-                            _category = ToolCategory.all;
-                            _paths = [];
-                          }),
+                          onPressed: _pendingIntakes > 0
+                              ? null
+                              : () => setState(() {
+                                  _query = '';
+                                  _search.clear();
+                                  _category = ToolCategory.all;
+                                  _paths = [];
+                                }),
                           child: const Text('Reset filters'),
                         ),
                       ],
