@@ -1,0 +1,1 @@
+These synthetic DOC, XLS, PPT and ODP fixtures contain only audit test data. They were generated locally by LibreOffice from the deterministic OOXML fixtures in `tool/audit_cli.py`. Keeping them here allows unsupported legacy-format diagnostics to be tested on machines without LibreOffice. No user documents are included.

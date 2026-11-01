@@ -1,0 +1,14 @@
+{
+  "source": "64x48 synthetic 4:2:0 JPEG",
+  "pillow_default_vs_dart_rgb_mae": [
+    17.63671875,
+    10.8134765625,
+    17.2626953125
+  ],
+  "libjpeg_djpeg_nosmooth_vs_dart_rgb_mae": [
+    0.1767578125,
+    0.146484375,
+    0.2197265625
+  ],
+  "conclusion": "Difference is chroma interpolation, confirmed against local libjpeg with smoothing disabled; no custom decoder was added."
+}

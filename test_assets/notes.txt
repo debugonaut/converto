@@ -1,0 +1,5 @@
+Converto Specification
+=============================
+100% Local execution on device.
+No cloud uploads, zero telemetry.
+Supported platforms: Android, Windows, macOS, Linux, iOS.

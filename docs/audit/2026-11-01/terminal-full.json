@@ -1,0 +1,92 @@
+{
+  "summary": {
+    "pass": 12,
+    "fail": 0
+  },
+  "results": [
+    {
+      "name": "ctrl-d",
+      "status": "pass",
+      "wall_ms": 288.663,
+      "exit_code": 0,
+      "output_bytes": 895
+    },
+    {
+      "name": "ctrl-c",
+      "status": "pass",
+      "wall_ms": 9.705,
+      "exit_code": 130,
+      "output_bytes": 897
+    },
+    {
+      "name": "exit-command",
+      "status": "pass",
+      "wall_ms": 9.641,
+      "exit_code": 0,
+      "output_bytes": 7708
+    },
+    {
+      "name": "bracketed-command",
+      "status": "pass",
+      "wall_ms": 12.698,
+      "exit_code": 0,
+      "output_bytes": 10257
+    },
+    {
+      "name": "bracketed-crlf",
+      "status": "pass",
+      "wall_ms": 14.089,
+      "exit_code": 0,
+      "output_bytes": 10335
+    },
+    {
+      "name": "multiline-uri-drop",
+      "status": "pass",
+      "wall_ms": 318.105,
+      "exit_code": 0,
+      "output_bytes": 9855
+    },
+    {
+      "name": "next-command-at-post-action",
+      "status": "pass",
+      "wall_ms": 14.609,
+      "exit_code": 0,
+      "output_bytes": 10257
+    },
+    {
+      "name": "next-command-after-multidrop",
+      "status": "pass",
+      "wall_ms": 79.901,
+      "exit_code": 0,
+      "output_bytes": 9853
+    },
+    {
+      "name": "ctrl-c-at-source-prompt",
+      "status": "pass",
+      "wall_ms": 11.038,
+      "exit_code": 130,
+      "output_bytes": 10139
+    },
+    {
+      "name": "unknown-escape-and-empty-paste",
+      "status": "pass",
+      "wall_ms": 10.507,
+      "exit_code": 0,
+      "output_bytes": 7708
+    },
+    {
+      "name": "paste-over-64kb",
+      "status": "pass",
+      "wall_ms": 24.808,
+      "exit_code": 0,
+      "output_bytes": 80267
+    },
+    {
+      "name": "bare-drop-and-repeated-drop-soak",
+      "status": "pass",
+      "wall_ms": 54.717,
+      "exit_code": 0,
+      "output_bytes": 75182
+    }
+  ]
+}

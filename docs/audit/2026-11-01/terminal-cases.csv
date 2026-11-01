@@ -1,0 +1,13 @@
+name,status,wall_ms,exit_code,output_bytes,error
+ctrl-d,pass,288.663,0,895,
+ctrl-c,pass,9.705,130,897,
+exit-command,pass,9.641,0,7708,
+bracketed-command,pass,12.698,0,10257,
+bracketed-crlf,pass,14.089,0,10335,
+multiline-uri-drop,pass,318.105,0,9855,
+next-command-at-post-action,pass,14.609,0,10257,
+next-command-after-multidrop,pass,79.901,0,9853,
+ctrl-c-at-source-prompt,pass,11.038,130,10139,
+unknown-escape-and-empty-paste,pass,10.507,0,7708,
+paste-over-64kb,pass,24.808,0,80267,
+bare-drop-and-repeated-drop-soak,pass,54.717,0,75182,

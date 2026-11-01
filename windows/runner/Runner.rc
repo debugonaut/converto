@@ -1,0 +1,42 @@
+// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include <windows.h>
+
+#define VERSION_AS_NUMBER 1,0,0,0
+#define VERSION_AS_STRING "1.0.0.0"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VERSION_AS_NUMBER
+ PRODUCTVERSION VERSION_AS_NUMBER
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "CompanyName", "Converto Open Source Contributors" "\0"
+            VALUE "FileDescription", "Converto - Local-First File Converter" "\0"
+            VALUE "FileVersion", VERSION_AS_STRING "\0"
+            VALUE "InternalName", "Converto" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026. Licensed under Apache 2.0." "\0"
+            VALUE "OriginalFilename", "converto.exe" "\0"
+            VALUE "ProductName", "Converto" "\0"
+            VALUE "ProductVersion", VERSION_AS_STRING "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END
+

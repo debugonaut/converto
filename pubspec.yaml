@@ -1,0 +1,49 @@
+name: converto
+description: "Converto - 100% offline file converter for Android, Windows, and all major platforms."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: ">=3.38.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # File handling & local storage
+  file_picker: ^8.0.0
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  desktop_drop: ^0.4.4
+
+  # Pure Dart image processing (100% offline)
+  image: ^4.2.0
+
+  # PDF generation, manipulation and vector drawing
+  pdf: ^3.10.8
+
+  # Office spreadsheets (XLSX, XLS, CSV)
+  excel: ^4.0.3
+  csv: ^6.0.0
+
+  # Archive and XML parsing for DOCX & PPTX
+  archive: ^3.6.1
+  xml: ^6.5.0
+
+  # Utilities & Icons
+  args: ^2.5.0
+  uuid: ^4.3.3
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.6
+  # Pinned while the isolated page-number position adapter matches this wire version.
+  pdf_manipulator: 5.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+

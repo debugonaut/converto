@@ -1,0 +1,231 @@
+{
+  "environment": "macOS-15.7.4-arm64-arm-64bit-Mach-O",
+  "measurements": [
+    {
+      "operation": "convert",
+      "representative": "image.png-to-pdf",
+      "wall_ms": 15.358,
+      "peak_rss_bytes": 20348928,
+      "input_bytes": 328,
+      "output_bytes": 2014,
+      "exit_code": 0
+    },
+    {
+      "operation": "pdf2img",
+      "representative": "pdf2img-png",
+      "wall_ms": 29.923,
+      "peak_rss_bytes": 28704768,
+      "input_bytes": 2122,
+      "output_bytes": 34363,
+      "exit_code": 0
+    },
+    {
+      "operation": "pdf2text",
+      "representative": "pdf2text",
+      "wall_ms": 15.983,
+      "peak_rss_bytes": 23494656,
+      "input_bytes": 2122,
+      "output_bytes": 155,
+      "exit_code": 0
+    },
+    {
+      "operation": "pdf2office",
+      "representative": "pdf2office-docx",
+      "wall_ms": 16.169,
+      "peak_rss_bytes": 24330240,
+      "input_bytes": 2122,
+      "output_bytes": 2655,
+      "exit_code": 0
+    },
+    {
+      "operation": "merge",
+      "representative": "merge-pdfs",
+      "wall_ms": 17.773,
+      "peak_rss_bytes": 23773184,
+      "input_bytes": 4244,
+      "output_bytes": 3958,
+      "exit_code": 0
+    },
+    {
+      "operation": "split",
+      "representative": "split-every",
+      "wall_ms": 17.75,
+      "peak_rss_bytes": 23887872,
+      "input_bytes": 2122,
+      "output_bytes": 2637,
+      "exit_code": 0
+    },
+    {
+      "operation": "extract",
+      "representative": "extract",
+      "wall_ms": 16.171,
+      "peak_rss_bytes": 23232512,
+      "input_bytes": 2122,
+      "output_bytes": 1604,
+      "exit_code": 0
+    },
+    {
+      "operation": "organize",
+      "representative": "organize-order",
+      "wall_ms": 16.213,
+      "peak_rss_bytes": 22970368,
+      "input_bytes": 2122,
+      "output_bytes": 2094,
+      "exit_code": 0
+    },
+    {
+      "operation": "rotate",
+      "representative": "rotate",
+      "wall_ms": 16.871,
+      "peak_rss_bytes": 23314432,
+      "input_bytes": 2122,
+      "output_bytes": 2097,
+      "exit_code": 0
+    },
+    {
+      "operation": "watermark",
+      "representative": "watermark",
+      "wall_ms": 16.177,
+      "peak_rss_bytes": 23560192,
+      "input_bytes": 2122,
+      "output_bytes": 3773,
+      "exit_code": 0
+    },
+    {
+      "operation": "page-numbers",
+      "representative": "page-numbers",
+      "wall_ms": 16.862,
+      "peak_rss_bytes": 23592960,
+      "input_bytes": 2122,
+      "output_bytes": 3512,
+      "exit_code": 0
+    },
+    {
+      "operation": "crop",
+      "representative": "crop",
+      "wall_ms": 17.419,
+      "peak_rss_bytes": 23642112,
+      "input_bytes": 2122,
+      "output_bytes": 2163,
+      "exit_code": 0
+    },
+    {
+      "operation": "compress",
+      "representative": "compress-ebook",
+      "wall_ms": 17.288,
+      "peak_rss_bytes": 23347200,
+      "input_bytes": 2122,
+      "output_bytes": 2094,
+      "exit_code": 0
+    },
+    {
+      "operation": "redact",
+      "representative": "redact",
+      "wall_ms": 19.934,
+      "peak_rss_bytes": 25231360,
+      "input_bytes": 2122,
+      "output_bytes": 2067,
+      "exit_code": 0
+    },
+    {
+      "operation": "pdfa",
+      "representative": "pdfa-2",
+      "wall_ms": 33.304,
+      "peak_rss_bytes": 35553280,
+      "input_bytes": 2122,
+      "output_bytes": 220031,
+      "exit_code": 0
+    },
+    {
+      "operation": "edit",
+      "representative": "edit",
+      "wall_ms": 18.506,
+      "peak_rss_bytes": 19103744,
+      "input_bytes": 328,
+      "output_bytes": 431,
+      "exit_code": 0
+    },
+    {
+      "operation": "protect",
+      "representative": "protect",
+      "wall_ms": 18.713,
+      "peak_rss_bytes": 23166976,
+      "input_bytes": 2122,
+      "output_bytes": 2972,
+      "exit_code": 0
+    },
+    {
+      "operation": "unlock",
+      "representative": "unlock",
+      "wall_ms": 19.335,
+      "peak_rss_bytes": 22708224,
+      "input_bytes": 2972,
+      "output_bytes": 2094,
+      "exit_code": 0
+    },
+    {
+      "operation": "info",
+      "representative": "info",
+      "wall_ms": 15.928,
+      "peak_rss_bytes": 21266432,
+      "input_bytes": 2122,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "formats",
+      "representative": "slash-formats",
+      "wall_ms": 12.944,
+      "peak_rss_bytes": 18235392,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "privacy",
+      "representative": "slash-privacy",
+      "wall_ms": 12.799,
+      "peak_rss_bytes": 18186240,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "recent",
+      "representative": "slash-recent",
+      "wall_ms": 12.553,
+      "peak_rss_bytes": 18153472,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "help",
+      "representative": "slash-help",
+      "wall_ms": 12.474,
+      "peak_rss_bytes": 18251776,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "clear",
+      "representative": "slash-clear",
+      "wall_ms": 12.209,
+      "peak_rss_bytes": 18087936,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    },
+    {
+      "operation": "exit",
+      "representative": "slash-exit",
+      "wall_ms": 12.125,
+      "peak_rss_bytes": 18137088,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "exit_code": 0
+    }
+  ],
+  "note": "One cold command per operation; peak RSS is the OS-reported process/child maximum, not summed concurrent tree memory."
+}

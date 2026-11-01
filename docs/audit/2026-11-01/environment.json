@@ -1,0 +1,11 @@
+{
+  "platform": "macOS-15.7.4-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.15.0",
+  "Pillow": "13.0.0",
+  "PyMuPDF": "1.28.2",
+  "dart": "Dart SDK version: 3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+  "LibreOffice": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "cwebp": "1.6.0",
+  "libjpeg": "libjpeg-turbo version 3.2.0 (build 20260630)"
+}

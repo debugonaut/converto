@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "missing_libraries_exit": 1,
+  "relocated_extract_exit": 0,
+  "path_was_empty_of_helpers": true,
+  "archive_entries": [
+    "bin/converto",
+    "lib/libpdf_oxide.dylib",
+    "lib/objective_c.dylib",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.txt"
+  ],
+  "binary_sha256": "2463cf4e8a94a743061f308f6d4cf76a2c39fdea676396f6a7d2d214d849cdcd",
+  "bundle_bytes": 33845120,
+  "archive_bytes": 14899619,
+  "archive_sha256": "8975778476c3d433f5289e3806c53451528e56fc626a04ca1e95c1e95bbdd1b8"
+}

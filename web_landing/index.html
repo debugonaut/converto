@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Converto - Local-First File Converter & Editor</title>
+  <meta name="description" content="Open-source, local-first file converter. Convert, merge, split, crop, compress and watermark PDFs, documents, spreadsheets, presentations, and images directly on your device.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Official Format SVG Sprite Definitions -->
+  <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" style="display: none;" aria-hidden="true">
+    <!-- Adobe PDF Official Symbol -->
+    <symbol id="icon-pdf" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#DC2626"/>
+      <path d="M19 12.8c-.4-.4-1.2-.5-2.2-.2-.8.2-1.7.7-2.6 1.4-1.3-.9-2.5-2.2-3.3-3.7.4-1.2.7-2.4.7-3.4 0-1.2-.4-1.9-1.2-1.9-.5 0-.9.4-1.1.9-.3 1.1 0 2.7.9 4.7-.6 1.7-1.5 3.7-2.6 5.3-.8.4-1.6.9-2.2 1.5-.7.7-.9 1.4-.6 1.9.3.4.8.6 1.4.6 1.3 0 2.8-1.2 4.1-3.2 1.8-.6 3.8-1 5.6-1.3.9.7 1.9 1.2 2.7 1.2.6 0 1-.3 1.1-.8.2-.5 0-1.1-.7-1.6zm-11.4 4c-.3-.3-.2-.7.2-1.2.5-.5 1.1-.9 1.8-1.3-1.1 1.6-1.7 2.2-2 2.5zm4.2-9.6c.1-.4.3-.6.5-.6.2 0 .3.2.3.6 0 .7-.2 1.5-.5 2.4-.3-1.2-.4-2-.3-2.4zm-1 6.8c.7 1.1 1.5 2 2.3 2.7-1.3.2-2.7.5-4 .9.8-1.2 1.4-2.4 1.7-3.6zm6.8 1.4c-.4 0-.9-.3-1.5-.8.5-.2.9-.3 1.3-.3.4 0 .5.2.5.4 0 .3-.1.5-.3.7z" fill="#FFFFFF"/>
+    </symbol>
+
+    <!-- Microsoft Word Official Symbol -->
+    <symbol id="icon-docx" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#185ABD"/>
+      <path d="M5.5 7.5L7.4 16.5H9.3L11 10.5L12.7 16.5H14.6L16.5 7.5H14.7L13.7 13.5L12 7.5H10.5L8.8 13.5L7.8 7.5H5.5Z" fill="#FFFFFF"/>
+    </symbol>
+
+    <!-- Microsoft Excel Official Symbol -->
+    <symbol id="icon-xlsx" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#107C41"/>
+      <path d="M6.8 7.5L10.2 12L6.8 16.5H9.1L11.4 13.3L13.7 16.5H16L12.6 12L16 7.5H13.7L11.4 10.7L9.1 7.5H6.8Z" fill="#FFFFFF"/>
+    </symbol>
+
+    <!-- Microsoft PowerPoint Official Symbol -->
+    <symbol id="icon-pptx" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#C43E1C"/>
+      <path d="M7.5 7.5H12C14.1 7.5 15.5 8.7 15.5 10.8C15.5 12.8 14.1 14 12 14H9.8V16.5H7.5V7.5ZM9.8 12.2H11.8C12.8 12.2 13.3 11.7 13.3 10.8C13.3 9.8 12.8 9.3 11.8 9.3H9.8V12.2Z" fill="#FFFFFF"/>
+    </symbol>
+
+    <!-- Raster / Vector Images Symbol -->
+    <symbol id="icon-img" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#7C3AED"/>
+      <circle cx="8" cy="8" r="1.8" fill="#FFFFFF"/>
+      <path d="M5 17.5L9.5 11.5L13 15L15.5 12.5L19 17.5H5Z" fill="#FFFFFF"/>
+    </symbol>
+
+    <!-- CSV / Spreadsheets Data Symbol -->
+    <symbol id="icon-csv" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#0D9488"/>
+      <path d="M5 5H19V19H5V5Z" stroke="#FFFFFF" stroke-width="1.3" fill="none"/>
+      <path d="M5 9.5H19M5 14H19M11 5V19" stroke="#FFFFFF" stroke-width="1.3"/>
+    </symbol>
+
+    <!-- Plain Text / Documents Symbol -->
+    <symbol id="icon-txt" viewBox="0 0 24 24">
+      <rect width="24" height="24" rx="4" fill="#475569"/>
+      <path d="M6 7.5H18M6 12H18M6 16.5H13" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+  <!-- Navigation Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <path d="M12 18v-6"/>
+          <path d="m9 15 3 3 3-3"/>
+        </svg>
+        <span class="brand-text">Converto</span>
+        <span class="badge">Local Only</span>
+      </div>
+
+      <nav class="nav-menu">
+        <a href="#formats" class="nav-link">Formats</a>
+        <a href="#features" class="nav-link">Operations</a>
+        <a href="#privacy" class="nav-link">Architecture</a>
+        <a href="#downloads" class="nav-link">Downloads</a>
+      </nav>
+
+      <div class="header-actions">
+        <a href="https://buymeacoffee.com" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+            <line x1="6" y1="1" x2="6" y2="4"/>
+            <line x1="10" y1="1" x2="10" y2="4"/>
+            <line x1="14" y1="1" x2="14" y2="4"/>
+          </svg>
+          <span>Buy Me a Coffee</span>
+        </a>
+        <a href="https://github.com/debugonaut/converto" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+        <button id="themeToggle" class="btn btn-icon btn-sm" aria-label="Toggle theme">
+          <svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-container">
+        <div class="announcement-pill">
+          <span class="status-dot"></span>
+          <span>Zero network requests. 100% device-side processing.</span>
+        </div>
+
+        <h1 class="hero-heading">Offline file converter and editor</h1>
+        <p class="hero-lead">
+          Convert, merge, split, crop, compress, and watermark your files directly on your computer or mobile device. Free and open source under Apache 2.0.
+        </p>
+
+        <!-- Detected Device Download Card -->
+        <div class="download-card">
+          <div class="download-card-body">
+            <div class="device-detected-row">
+              <span class="device-label" id="deviceLabel">Detected device: macOS</span>
+              <span class="version-label">Release v1.0.0</span>
+            </div>
+            <div class="download-cta-group">
+              <a href="#downloads" id="primaryDownloadBtn" class="btn btn-primary btn-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span id="primaryDownloadText">Download for macOS</span>
+              </a>
+              <span class="download-meta" id="downloadMeta">Apple Silicon &amp; Intel &bull; Standalone .dmg</span>
+            </div>
+          </div>
+          <div class="download-card-footer">
+            <span>Also available for:</span>
+            <a href="#downloads-windows">Windows</a>
+            <span class="sep">&bull;</span>
+            <a href="#downloads-linux">Linux</a>
+            <span class="sep">&bull;</span>
+            <a href="#downloads-android">Android (APK)</a>
+            <span class="sep">&bull;</span>
+            <a href="#downloads-ios">iOS</a>
+          </div>
+        </div>
+
+        <!-- Terminal CLI Quick Install Card -->
+        <div class="cli-quick-install">
+          <div class="cli-install-header">
+            <span class="cli-install-title">Install CLI via terminal</span>
+            <div class="cli-tabs" role="tablist">
+              <button class="cli-tab active" data-cmd="npm install -g converto" type="button">npm</button>
+              <button class="cli-tab" data-cmd="pnpm add -g converto" type="button">pnpm</button>
+              <button class="cli-tab" data-cmd="brew install converto" type="button">brew</button>
+              <button class="cli-tab" data-cmd="curl -fsSL https://get.converto.app | sh" type="button">curl</button>
+            </div>
+          </div>
+          <div class="cli-command-box">
+            <div class="cli-cmd-left">
+              <span class="cli-prompt">$</span>
+              <code id="cliCommandText">npm install -g converto</code>
+            </div>
+            <button class="copy-btn" id="copyCmdBtn" type="button" aria-label="Copy install command">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span id="copyBtnText">Copy</span>
+            </button>
+          </div>
+          <div class="cli-subtext">
+            <span>Or run directly with zero install: <code>npx converto convert input.csv -t pdf</code></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Supported Formats Matrix -->
+    <section id="formats" class="section">
+      <div class="section-container">
+        <h2 class="section-heading">Supported formats</h2>
+        <p class="section-description">
+          All major document, image, spreadsheet, and presentation formats are handled without server-side dependencies.
+        </p>
+
+        <!-- Primary Formats Visual Showcase -->
+        <div class="format-showcase">
+          <div class="format-card format-card-pdf">
+            <div class="format-card-top">
+              <div class="format-card-icon">
+                <svg width="34" height="34" aria-hidden="true"><use href="#icon-pdf"></use></svg>
+              </div>
+              <span class="format-card-badge">PDF</span>
+            </div>
+            <h3 class="format-card-title">Adobe PDF</h3>
+            <span class="format-card-exts">.pdf</span>
+            <p class="format-card-desc">Merge multi-file PDFs, split page ranges, diagonal watermark, and rasterize to images.</p>
+          </div>
+
+          <div class="format-card format-card-docx">
+            <div class="format-card-top">
+              <div class="format-card-icon">
+                <svg width="34" height="34" aria-hidden="true"><use href="#icon-docx"></use></svg>
+              </div>
+              <span class="format-card-badge">Word</span>
+            </div>
+            <h3 class="format-card-title">Microsoft Word</h3>
+            <span class="format-card-exts">.docx · .doc · .odt · .rtf</span>
+            <p class="format-card-desc">Lossless vector PDF rendering, OpenXML stream parsing, and desktop headless bridge.</p>
+          </div>
+
+          <div class="format-card format-card-xlsx">
+            <div class="format-card-top">
+              <div class="format-card-icon">
+                <svg width="34" height="34" aria-hidden="true"><use href="#icon-xlsx"></use></svg>
+              </div>
+              <span class="format-card-badge">Excel</span>
+            </div>
+            <h3 class="format-card-title">Microsoft Excel</h3>
+            <span class="format-card-exts">.xlsx · .xls · .csv</span>
+            <p class="format-card-desc">Auto-paginated vector tables with landscape formatting, and standardized CSV export.</p>
+          </div>
+
+          <div class="format-card format-card-pptx">
+            <div class="format-card-top">
+              <div class="format-card-icon">
+                <svg width="34" height="34" aria-hidden="true"><use href="#icon-pptx"></use></svg>
+              </div>
+              <span class="format-card-badge">PowerPoint</span>
+            </div>
+            <h3 class="format-card-title">PowerPoint</h3>
+            <span class="format-card-exts">.pptx · .ppt · .odp</span>
+            <p class="format-card-desc">Slide presentation decks to vector PDF or high-DPI slide image frames.</p>
+          </div>
+
+          <div class="format-card format-card-img">
+            <div class="format-card-top">
+              <div class="format-card-icon">
+                <svg width="34" height="34" aria-hidden="true"><use href="#icon-img"></use></svg>
+              </div>
+              <span class="format-card-badge">Images</span>
+            </div>
+            <h3 class="format-card-title">Raster Images</h3>
+            <span class="format-card-exts">.png · .jpg · .webp · .gif · .tiff</span>
+            <p class="format-card-desc">90° rotation, aspect ratio crop, quality slider, and multi-image vector PDF compile.</p>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="format-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Input Formats</th>
+                <th>Output Targets</th>
+                <th>Operations Supported</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cat-cell"><strong>PDF Documents</strong></td>
+                <td><span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pdf"></use></svg> PDF</span></td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> PNG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> JPG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> WEBP</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-txt"></use></svg> TXT</span>
+                </td>
+                <td>Merge multiple PDFs, split by page range, extract single pages, apply watermark, compress</td>
+              </tr>
+              <tr>
+                <td class="cat-cell"><strong>Images</strong></td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> JPG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> PNG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> WEBP</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> BMP</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> GIF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> TIFF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> ICO</span>
+                </td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pdf"></use></svg> PDF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> PNG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> JPG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> WEBP</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> BMP</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> TIFF</span>
+                </td>
+                <td>Convert format, crop with aspect ratio, rotate (90°/180°/270°), compress quality slider, merge images to multi-page PDF</td>
+              </tr>
+              <tr>
+                <td class="cat-cell"><strong>Word Documents</strong></td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-docx"></use></svg> DOCX</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-docx"></use></svg> DOC</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-docx"></use></svg> ODT</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-docx"></use></svg> RTF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-txt"></use></svg> TXT</span>
+                </td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pdf"></use></svg> PDF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-txt"></use></svg> TXT</span>
+                </td>
+                <td>Convert to PDF with vector layout; pure offline fallback parsing on mobile; headless CLI on desktop</td>
+              </tr>
+              <tr>
+                <td class="cat-cell"><strong>Spreadsheets</strong></td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-xlsx"></use></svg> XLSX</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-xlsx"></use></svg> XLS</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-csv"></use></svg> CSV</span>
+                </td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pdf"></use></svg> PDF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-csv"></use></svg> CSV</span>
+                </td>
+                <td>Convert sheets to auto-paginated PDF vector tables; export sheet data to standardized UTF-8 CSV</td>
+              </tr>
+              <tr>
+                <td class="cat-cell"><strong>Presentations</strong></td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pptx"></use></svg> PPTX</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pptx"></use></svg> PPT</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pptx"></use></svg> ODP</span>
+                </td>
+                <td>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-pdf"></use></svg> PDF</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> PNG</span>
+                  <span class="format-pill"><svg class="pill-icon" aria-hidden="true"><use href="#icon-img"></use></svg> JPG</span>
+                </td>
+                <td>Convert slides to multi-page PDF or export individual presentation slides as high-DPI images</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operations & Features -->
+    <section id="features" class="section border-top">
+      <div class="section-container">
+        <h2 class="section-heading">Conversion and editing capabilities</h2>
+        <p class="section-description">
+          Core toolset available across macOS, Windows, Linux, Android, and iOS from a single local application.
+        </p>
+
+        <div class="feature-grid">
+          <div class="feature-item">
+            <div class="feature-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <h3>Image Studio</h3>
+            </div>
+            <p>Interactive cropping with preset aspect ratios (1:1, 4:3, 16:9), orthogonal 90-degree rotations, horizontal/vertical flips, and quality-controlled compression with estimated file size output.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <h3>PDF Manipulator</h3>
+            </div>
+            <p>Combine multiple disparate PDFs into a single document, split documents by custom page intervals (e.g. 1-4, 7, 9-12), extract individual pages, and render PDF pages to high-DPI bitmap images.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <h3>Text Watermarking</h3>
+            </div>
+            <p>Apply customizable diagonal or centered text watermarks to any PDF document. Configure opacity, angle, font scale, and positioning to protect drafts or mark confidentiality.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <h3>Batch Queue</h3>
+            </div>
+            <p>Drop dozens of files into a conversion queue simultaneously. The engine processes items across background isolates, leveraging multi-core hardware without freezing the user interface.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture & Local Privacy Verification -->
+    <section id="privacy" class="section border-top">
+      <div class="section-container">
+        <h2 class="section-heading">Local architecture and privacy</h2>
+        <p class="section-description">
+          How Converto guarantees that data never leaves your machine.
+        </p>
+
+        <div class="arch-box">
+          <div class="arch-item">
+            <h3>No Remote Network Endpoints</h3>
+            <p>The application manifests on macOS, Windows, Linux, Android, and iOS contain zero cloud API keys, zero analytics SDKs, and zero upload endpoints. The app functions fully in air-gapped environments or with network adapters disabled.</p>
+          </div>
+          <div class="arch-item">
+            <h3>Device-Managed Storage</h3>
+            <p>Converted output files are written directly to your local file system under <code>~/Documents/Converto/</code>. Temporary processing buffers are purged from memory immediately upon job completion.</p>
+          </div>
+          <div class="arch-item">
+            <h3>Open Source and Auditable</h3>
+            <p>Every line of conversion logic, UI code, and build configuration is published under the Apache 2.0 license. Anyone can inspect, build from source, or audit the binaries.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Platform Downloads Section -->
+    <section id="downloads" class="section border-top">
+      <div class="section-container">
+        <h2 class="section-heading">Platform installers</h2>
+        <p class="section-description">
+          Select the build matching your hardware architecture.
+        </p>
+
+        <div class="downloads-list">
+          <!-- macOS -->
+          <div class="download-row" id="downloads-macos" data-os="macos">
+            <div class="dl-info">
+              <span class="dl-name">macOS</span>
+              <span class="dl-spec">Universal Binary (Apple Silicon M1/M2/M3/M4 &amp; Intel) &bull; macOS 11.0+</span>
+            </div>
+            <div class="dl-btn-group">
+              <a href="https://github.com/releases/download/v1.0.0/Converto-macOS-arm64.dmg" class="btn btn-outline btn-sm">Apple Silicon (.dmg)</a>
+              <a href="https://github.com/releases/download/v1.0.0/Converto-macOS-x64.dmg" class="btn btn-outline btn-sm">Intel (.dmg)</a>
+            </div>
+          </div>
+
+          <!-- Windows -->
+          <div class="download-row" id="downloads-windows" data-os="windows">
+            <div class="dl-info">
+              <span class="dl-name">Windows</span>
+              <span class="dl-spec">x64 Architecture &bull; Windows 10 &amp; 11</span>
+            </div>
+            <div class="dl-btn-group">
+              <a href="https://github.com/releases/download/v1.0.0/Converto-Windows-Setup.exe" class="btn btn-outline btn-sm">Installer (.exe)</a>
+              <a href="https://github.com/releases/download/v1.0.0/Converto-Windows-portable.zip" class="btn btn-outline btn-sm">Portable (.zip)</a>
+            </div>
+          </div>
+
+          <!-- Linux -->
+          <div class="download-row" id="downloads-linux" data-os="linux">
+            <div class="dl-info">
+              <span class="dl-name">Linux</span>
+              <span class="dl-spec">x86_64 &bull; Ubuntu, Debian, Fedora, Arch</span>
+            </div>
+            <div class="dl-btn-group">
+              <a href="https://github.com/releases/download/v1.0.0/Converto-Linux.AppImage" class="btn btn-outline btn-sm">AppImage</a>
+              <a href="https://github.com/releases/download/v1.0.0/Converto-Linux.deb" class="btn btn-outline btn-sm">Debian (.deb)</a>
+            </div>
+          </div>
+
+          <!-- Android -->
+          <div class="download-row" id="downloads-android" data-os="android">
+            <div class="dl-info">
+              <span class="dl-name">Android</span>
+              <span class="dl-spec">arm64-v8a, armeabi-v7a &bull; Android 8.0+</span>
+            </div>
+            <div class="dl-btn-group">
+              <a href="https://github.com/releases/download/v1.0.0/Converto-release.apk" class="btn btn-outline btn-sm">Direct APK</a>
+              <a href="https://f-droid.org" target="_blank" rel="noopener" class="btn btn-outline btn-sm">F-Droid</a>
+            </div>
+          </div>
+
+          <!-- iOS -->
+          <div class="download-row" id="downloads-ios" data-os="ios">
+            <div class="dl-info">
+              <span class="dl-name">iOS &amp; iPadOS</span>
+              <span class="dl-spec">Native WebKit &amp; PDFKit vector engine &bull; iOS 15.0+</span>
+            </div>
+            <div class="dl-btn-group">
+              <a href="https://testflight.apple.com" target="_blank" rel="noopener" class="btn btn-outline btn-sm">TestFlight</a>
+              <a href="https://apps.apple.com" target="_blank" rel="noopener" class="btn btn-outline btn-sm">App Store</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Support Section -->
+    <section id="support" class="section border-top">
+      <div class="section-container">
+        <div class="support-panel">
+          <div class="support-content">
+            <h2 class="section-heading">Open-source and community supported</h2>
+            <p class="section-description">
+              Converto is published under the Apache 2.0 license. It contains no advertisements, paid tiers, or feature paywalls. If this tool saves you time, donations help support ongoing maintenance and native platform builds.
+            </p>
+          </div>
+          <div class="support-actions">
+            <a href="https://buymeacoffee.com" target="_blank" rel="noopener" class="btn btn-primary btn-md">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                <line x1="6" y1="1" x2="6" y2="4"/>
+                <line x1="10" y1="1" x2="10" y2="4"/>
+                <line x1="14" y1="1" x2="14" y2="4"/>
+              </svg>
+              Buy Me a Coffee
+            </a>
+            <a href="https://github.com/sponsors" target="_blank" rel="noopener" class="btn btn-outline btn-md">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              Sponsor on GitHub
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Essential Footer -->
+  <footer class="site-footer border-top">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="brand">
+            <svg class="brand-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span class="brand-text">Converto</span>
+          </div>
+          <p class="footer-tagline">100% offline file converter for desktop and mobile.</p>
+        </div>
+
+        <div class="footer-nav-groups">
+          <div class="footer-group">
+            <span class="group-title">Product</span>
+            <a href="#formats">Supported Formats</a>
+            <a href="#features">Operations</a>
+            <a href="#privacy">Privacy Model</a>
+            <a href="#downloads">Downloads</a>
+          </div>
+
+          <div class="footer-group">
+            <span class="group-title">Open Source</span>
+            <a href="https://github.com/debugonaut/converto" target="_blank" rel="noopener">GitHub Repository</a>
+            <a href="https://github.com/debugonaut/converto/releases" target="_blank" rel="noopener">Releases &amp; Changelog</a>
+            <a href="https://github.com/debugonaut/converto/issues" target="_blank" rel="noopener">Report an Issue</a>
+            <a href="https://github.com/debugonaut/converto/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0 License</a>
+          </div>
+
+          <div class="footer-group">
+            <span class="group-title">Community</span>
+            <a href="#support">Buy Me a Coffee</a>
+            <a href="https://github.com/sponsors" target="_blank" rel="noopener">GitHub Sponsors</a>
+            <a href="https://impeccable.style" target="_blank" rel="noopener">Design: Impeccable</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom border-top">
+        <span class="footer-copy">&copy; 2026 Converto. Released under the Apache-2.0 License.</span>
+        <span class="footer-note">No cookies. No trackers. Local files only.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

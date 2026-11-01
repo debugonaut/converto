@@ -1,0 +1,25 @@
+# Local build output and dependency caches
+build/
+dist/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+node_modules/
+__pycache__/
+*.pyc
+
+# Machine-specific native build configuration
+android/.gradle/
+android/local.properties
+windows/flutter/ephemeral/
+macos/Flutter/ephemeral/
+ios/Flutter/ephemeral/
+Pods/
+
+# Local credentials and tool state
+.env
+.env.*
+!.env.example
+.freebuff/
+.DS_Store

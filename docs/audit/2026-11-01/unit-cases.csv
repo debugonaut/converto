@@ -1,0 +1,80 @@
+name,result,duration_ms,finish_ms_from_run_start
+FileUtils Tests formatBytes formats properly,success,21,1101
+FileUtils Tests getExtension extracts lowercase clean extension,success,3,1105
+FileUtils Tests sanitizeFileName removes illegal filesystem characters,success,2,1107
+FileUtils Tests listSupportedFiles discovers valid files and skips hidden files,success,7,1115
+FormatRegistry Tests Image formats return PDF and image targets,success,3,1119
+FormatRegistry Tests PDF format returns image and text targets,success,3,1123
+FormatRegistry Tests Spreadsheet format returns PDF and CSV targets,success,1,1124
+command catalog every command is unique and has a group,success,13,1143
+command catalog filters by prefix,success,2,1145
+command catalog suggests the closest command for typos,success,5,1151
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats preserves backslashes in plain Windows paths,success,16,1157
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats parses double-quoted Windows paths with spaces,success,4,1161
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats normalizes trailing backslash on Windows directory paths,success,2,1163
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats preserves Windows root drive path,success,1,1164
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats strips PowerShell call operator (&) with double quotes,success,1,1165
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats strips PowerShell call operator (&) with single quotes,success,2,1167
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats strips PowerShell call operator (&) plain unquoted,success,1,1168
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats parses multiple Windows files dragged simultaneously (plain),success,1,1169
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats parses multiple Windows files dragged simultaneously (quoted),success,1,1170
+Cross-Platform Drag-and-Drop Parsing Tests Windows Drag and Drop Formats parses Windows file with shorthand target format,success,1,1171
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats unescapes backslash-escaped spaces (Finder Terminal.app format),success,1,1173
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats parses single-quoted paths with spaces (iTerm2 format),success,1,1174
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats normalizes trailing slash on dropped macOS folders,success,1,1175
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats preserves Unix root directory,success,1,1176
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats parses multiple macOS files dropped together,success,1,1177
+Cross-Platform Drag-and-Drop Parsing Tests macOS Drag and Drop Formats parses macOS file with shorthand target format,success,1,1178
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats resolves file:// URI to standard filesystem path,success,1,1179
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats resolves and decodes URL-encoded file:// URI (%20 to space),success,1,1180
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats resolves file://localhost/... XDND variant,success,1,1181
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats handles newline-separated multi-file drops from Nautilus,success,1,1182
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats normalizes trailing slash on Linux folder URIs,success,1,1183
+Cross-Platform Drag-and-Drop Parsing Tests Linux (Nautilus / Dolphin) Drag and Drop Formats parses Linux file URI with shorthand target format,success,1,1184
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases strips bracketed paste markers,success,1,1185
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases strips legacy 00~/01~ bracketed paste fragments,success,1,1186
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases handles empty input gracefully,success,2,1188
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases handles single unmatched quotes without RangeError,success,1,1189
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases tokenizes slash commands with Windows paths,success,1,1191
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases tokenizes slash commands with macOS paths,success,1,1192
+Cross-Platform Drag-and-Drop Parsing Tests Bracketed Paste and Edge Cases exact user command: /convert single quoted path,success,2,1194
+ImageConverter Tests converts PNG image to PDF document,success,92,1216
+ImageConverter Tests converts PNG to JPG format,success,18,1234
+Local text encoding and font safety UTF-16 LE preserves surrogate pairs,success,15,1259
+Local text encoding and font safety UTF-16 BE preserves surrogate pairs,success,2,1261
+"Local text encoding and font safety rejects malformed UTF-16 [255, 254, 65]",success,4,1265
+"Local text encoding and font safety rejects malformed UTF-16 [255, 254, 0, 216]",success,2,1267
+SpreadsheetConverter Tests converts CSV to paginated PDF table,success,34,1268
+Local text encoding and font safety UTF-8 BOM is decoded,success,2,1269
+Local text encoding and font safety retains WinAnsi punctuation and detects non-Western text,success,2,1271
+Terminal input regressions /tmp/apostrophe\'s.png pdf,success,1,1272
+"Terminal input regressions /tmp/quote\""name.png pdf",success,1,1274
+Terminal input regressions /tmp/a\(1\)\&\[2\]\#\$.png,success,0,1274
+Terminal input regressions '/tmp/a'\''b.png',success,1,1275
+"Terminal input regressions ""/tmp/a\""b.png""",success,1,1276
+DocumentConverter Tests converts plain text to PDF document,success,9,1277
+Terminal input regressions /tmp/a.png	/tmp/b.png,success,1,1277
+PlatformDetector Tests detect returns valid platform capabilities,success,1,1278
+"Terminal input regressions file:///tmp/a.png
+file:///tmp/b.png",success,1,1278
+Terminal input regressions file:///C:/Users/Jo/My%20File.pdf,success,1,1280
+Terminal input regressions \\server\share\file.pdf,success,2,1282
+Terminal input regressions & 'C:\Users\Jo\O''Brien.pdf',success,2,1284
+"Terminal input regressions ""/tmp/ é 你好 .png""",success,1,1285
+Terminal input regressions /tmp/00~real01~.png,success,0,1285
+Terminal input regressions '/tmp/ space .png ',success,0,1286
+Terminal input regressions remote file URI is rejected,success,1,1287
+Terminal input regressions malformed URI escape is rejected,success,1,1288
+Terminal input regressions unclosed filename quote is rejected,success,0,1288
+a failed atomic write preserves an existing destination and cleans staging,success,4,1292
+Converto CLI Integration Tests CLI --help prints usage,success,21,1322
+Converto CLI Integration Tests CLI formats lists supported categories,success,15,1337
+Converto CLI Integration Tests CLI convert CSV to PDF,success,18,1355
+Converto CLI Integration Tests CLI watermark on PDF,success,34,1389
+Converto CLI Integration Tests CLI info reads page count and metadata,success,17,1406
+Converto CLI Integration Tests CLI split writes one PDF per part,success,20,1426
+"Converto CLI Integration Tests CLI organize, rotate, page numbers, compress, PDF/A",success,103,1529
+Converto CLI Integration Tests CLI protect and unlock round-trip,success,68,1597
+Converto CLI Integration Tests CLI pdf2text and pdf2office produce readable outputs,success,35,1632
+Converto CLI Integration Tests CLI pdf2img exports every page,success,42,1674
+Converto CLI Integration Tests CLI redact removes matched text permanently,success,35,1709

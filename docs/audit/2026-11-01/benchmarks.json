@@ -1,0 +1,208 @@
+{
+  "environment": "macOS-15.7.4-arm64-arm-64bit-Mach-O",
+  "samples_per_case": 3,
+  "before_sha256": "1ec9d298bb12c5cd6bed98b2a6073b28d274b6c731b4bd56923e9a545916b61e",
+  "after_sha256": "2463cf4e8a94a743061f308f6d4cf76a2c39fdea676396f6a7d2d214d849cdcd",
+  "results": [
+    {
+      "case": "jpeg-to-pdf",
+      "version": "before",
+      "input_bytes": 3196346,
+      "input_sha256": "3e7db405c9b814e28f7cba76338db1b6a992518e2a0d9f9c2584ea086ca110fc",
+      "samples": [
+        {
+          "wall_ms": 1628.666,
+          "peak_rss_bytes": 214859776,
+          "output_bytes": 11301391
+        },
+        {
+          "wall_ms": 1609.9,
+          "peak_rss_bytes": 214843392,
+          "output_bytes": 11301391
+        },
+        {
+          "wall_ms": 1599.519,
+          "peak_rss_bytes": 219103232,
+          "output_bytes": 11301391
+        }
+      ],
+      "median_wall_ms": 1609.9,
+      "median_peak_rss_bytes": 214859776
+    },
+    {
+      "case": "jpeg-to-pdf",
+      "version": "after",
+      "input_bytes": 3196346,
+      "input_sha256": "3e7db405c9b814e28f7cba76338db1b6a992518e2a0d9f9c2584ea086ca110fc",
+      "samples": [
+        {
+          "wall_ms": 36.044,
+          "peak_rss_bytes": 45285376,
+          "output_bytes": 3197312
+        },
+        {
+          "wall_ms": 29.653,
+          "peak_rss_bytes": 45252608,
+          "output_bytes": 3197312
+        },
+        {
+          "wall_ms": 36.122,
+          "peak_rss_bytes": 45367296,
+          "output_bytes": 3197312
+        }
+      ],
+      "median_wall_ms": 36.044,
+      "median_peak_rss_bytes": 45285376
+    },
+    {
+      "case": "png-to-jpg",
+      "version": "before",
+      "input_bytes": 11534696,
+      "input_sha256": "84a2794dad7ae2561c22b8ffea2521c3c59063a4bfeffb61ed85928e158f0824",
+      "samples": [
+        {
+          "wall_ms": 781.485,
+          "peak_rss_bytes": 118603776,
+          "output_bytes": 6071519
+        },
+        {
+          "wall_ms": 795.939,
+          "peak_rss_bytes": 124125184,
+          "output_bytes": 6071519
+        },
+        {
+          "wall_ms": 788.519,
+          "peak_rss_bytes": 123158528,
+          "output_bytes": 6071519
+        }
+      ],
+      "median_wall_ms": 788.519,
+      "median_peak_rss_bytes": 123158528
+    },
+    {
+      "case": "png-to-jpg",
+      "version": "after",
+      "input_bytes": 11534696,
+      "input_sha256": "84a2794dad7ae2561c22b8ffea2521c3c59063a4bfeffb61ed85928e158f0824",
+      "samples": [
+        {
+          "wall_ms": 794.067,
+          "peak_rss_bytes": 124010496,
+          "output_bytes": 6071519
+        },
+        {
+          "wall_ms": 789.844,
+          "peak_rss_bytes": 124108800,
+          "output_bytes": 6071519
+        },
+        {
+          "wall_ms": 788.539,
+          "peak_rss_bytes": 124403712,
+          "output_bytes": 6071519
+        }
+      ],
+      "median_wall_ms": 789.844,
+      "median_peak_rss_bytes": 124108800
+    },
+    {
+      "case": "txt-to-pdf",
+      "version": "before",
+      "input_bytes": 58889,
+      "input_sha256": "e570d3e3b1ae79ce0c13fdde8e6196f879138dd71871a2481e8e9edb51bb2f94",
+      "samples": [
+        {
+          "wall_ms": 568.118,
+          "peak_rss_bytes": 149258240,
+          "output_bytes": 286203
+        },
+        {
+          "wall_ms": 568.164,
+          "peak_rss_bytes": 149143552,
+          "output_bytes": 286203
+        },
+        {
+          "wall_ms": 570.418,
+          "peak_rss_bytes": 149192704,
+          "output_bytes": 286203
+        }
+      ],
+      "median_wall_ms": 568.164,
+      "median_peak_rss_bytes": 149192704
+    },
+    {
+      "case": "txt-to-pdf",
+      "version": "after",
+      "input_bytes": 58889,
+      "input_sha256": "e570d3e3b1ae79ce0c13fdde8e6196f879138dd71871a2481e8e9edb51bb2f94",
+      "samples": [
+        {
+          "wall_ms": 38.216,
+          "peak_rss_bytes": 69599232,
+          "output_bytes": 26434
+        },
+        {
+          "wall_ms": 37.9,
+          "peak_rss_bytes": 69468160,
+          "output_bytes": 26434
+        },
+        {
+          "wall_ms": 37.91,
+          "peak_rss_bytes": 69517312,
+          "output_bytes": 26434
+        }
+      ],
+      "median_wall_ms": 37.91,
+      "median_peak_rss_bytes": 69517312
+    },
+    {
+      "case": "merge-400-pages",
+      "version": "before",
+      "input_bytes": 70257,
+      "input_sha256": "b7056ddc3256a3b7bd88bd086184e838d301274baf1648cc27c1709a2214e763",
+      "samples": [
+        {
+          "wall_ms": 307.016,
+          "peak_rss_bytes": 31948800,
+          "output_bytes": 151275
+        },
+        {
+          "wall_ms": 114.524,
+          "peak_rss_bytes": 30900224,
+          "output_bytes": 151275
+        },
+        {
+          "wall_ms": 115.683,
+          "peak_rss_bytes": 30867456,
+          "output_bytes": 151275
+        }
+      ],
+      "median_wall_ms": 115.683,
+      "median_peak_rss_bytes": 30900224
+    },
+    {
+      "case": "merge-400-pages",
+      "version": "after",
+      "input_bytes": 70257,
+      "input_sha256": "b7056ddc3256a3b7bd88bd086184e838d301274baf1648cc27c1709a2214e763",
+      "samples": [
+        {
+          "wall_ms": 114.552,
+          "peak_rss_bytes": 31260672,
+          "output_bytes": 151275
+        },
+        {
+          "wall_ms": 113.798,
+          "peak_rss_bytes": 31244288,
+          "output_bytes": 151275
+        },
+        {
+          "wall_ms": 113.746,
+          "peak_rss_bytes": 31047680,
+          "output_bytes": 151275
+        }
+      ],
+      "median_wall_ms": 113.798,
+      "median_peak_rss_bytes": 31244288
+    }
+  ]
+}

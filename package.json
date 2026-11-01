@@ -1,0 +1,32 @@
+{
+  "name": "converto",
+  "version": "1.0.0",
+  "description": "100% offline local file converter CLI for documents, images, spreadsheets, and presentations.",
+  "main": "bin/cli.js",
+  "bin": {
+    "converto": "bin/cli.js"
+  },
+  "scripts": {
+    "build:cli": "dart build cli --target bin/converto.dart",
+    "test": "node --test test/launcher_test.cjs",
+    "test:cli": "dart tool/verify_cli.dart"
+  },
+  "files": ["bin/cli.js", "build/cli/*/bundle/**", "README.md", "LICENSE"],
+  "keywords": [
+    "converto",
+    "file-converter",
+    "pdf",
+    "docx",
+    "xlsx",
+    "pptx",
+    "offline",
+    "cli"
+  ],
+  "author": "Converto Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/debugonaut/converto.git"
+  }
+}
+
