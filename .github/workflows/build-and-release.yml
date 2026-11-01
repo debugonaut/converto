@@ -1,4 +1,4 @@
-name: Verify and Package CLI
+name: Verify and Package Converto
 
 on:
   push:
@@ -41,6 +41,23 @@ jobs:
       - name: Check real terminal behavior
         shell: bash
         run: python tool/test_terminal.py --binary "$(cat build/cli-path.txt)" --output build/audit/terminal
+      - name: Audit GUI execution and transactional outputs on Mac
+        if: runner.os == 'macOS'
+        run: dart run tool/audit_gui.dart
+      - name: Build native Mac app
+        if: runner.os == 'macOS'
+        run: flutter build macos --release --no-pub
+      - name: Package Mac preview
+        if: runner.os == 'macOS'
+        run: python tool/package_macos.py
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: macos-app-preview
+          path: |
+            Converto-macOS-preview.zip
+            build/audit/gui/results.json
+            build/audit/gui/package.json
       - name: Install optional local codecs on Linux for full format audit
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libreoffice webp fonts-noto-cjk

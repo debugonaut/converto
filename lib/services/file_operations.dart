@@ -27,6 +27,8 @@ class FileOperations {
     required String targetFormat,
     String? outputPath,
     int quality = 85,
+    ImageEditOptions? imageOptions,
+    bool recordHistory = true,
     void Function(double)? onProgress,
   }) async {
     if (!sourceFile.existsSync())
@@ -44,21 +46,23 @@ class FileOperations {
       sourceFile: sourceFile,
       targetFormat: target,
       outputPath: outputPath,
-      imageOptions: ImageEditOptions(compressionQuality: quality),
+      imageOptions:
+          imageOptions ?? ImageEditOptions(compressionQuality: quality),
       onProgress: onProgress,
     );
-    await HistoryService().addRecord(
-      HistoryItem(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        sourceName: FileUtils.getFileName(sourceFile.path),
-        sourcePath: sourceFile.path,
-        sourceFormat: ext,
-        targetPath: result.path,
-        targetFormat: target,
-        fileSizeBytes: await result.length(),
-        timestamp: DateTime.now(),
-      ),
-    );
+    if (recordHistory)
+      await HistoryService().addRecord(
+        HistoryItem(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          sourceName: FileUtils.getFileName(sourceFile.path),
+          sourcePath: sourceFile.path,
+          sourceFormat: ext,
+          targetPath: result.path,
+          targetFormat: target,
+          fileSizeBytes: await result.length(),
+          timestamp: DateTime.now(),
+        ),
+      );
     return result;
   }
 

@@ -2,482 +2,726 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import '../../core/constants/format_types.dart';
 import '../../core/platform/platform_detector.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
-import '../../models/conversion_job.dart';
-import '../../models/file_item.dart';
-import '../../services/conversion_coordinator.dart';
+import '../../models/gui/tool_definition.dart';
+import '../../services/gui/file_intake.dart';
+import '../../services/gui/gui_job_controller.dart';
+import '../../services/gui/gui_preferences.dart';
 import '../../services/history_service.dart';
+import '../../services/local_process.dart';
 import '../../services/storage_service.dart';
+import '../tool_icons.dart';
+import 'tool_workspace.dart';
 
 class HomeDashboard extends StatefulWidget {
-  final VoidCallback onToggleTheme;
-  final bool isDark;
-
-  const HomeDashboard({
-    super.key,
-    required this.onToggleTheme,
-    required this.isDark,
-  });
-
+  const HomeDashboard({super.key});
   @override
   State<HomeDashboard> createState() => _HomeDashboardState();
 }
 
 class _HomeDashboardState extends State<HomeDashboard> {
-  bool _isDragging = false;
-  PlatformCapabilities? _capabilities;
-  List<HistoryItem> _recentHistory = [];
+  final _preferences = GuiPreferences();
+  final _job = GuiJobController();
+  final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+  List<String> _paths = [];
+  ToolDefinition? _tool;
+  ToolCategory _category = ToolCategory.all;
+  bool _recent = false;
+  bool _dragging = false;
+  String _query = '';
+  Future<void> _intakeTail = Future.value();
 
   @override
   void initState() {
     super.initState();
-    _loadCapabilities();
-    _loadHistory();
+    _job.addListener(_refresh);
+    _load();
   }
 
-  Future<void> _loadCapabilities() async {
-    final caps = await PlatformDetector.detect();
-    if (mounted) {
-      setState(() => _capabilities = caps);
-    }
-  }
-
-  Future<void> _loadHistory() async {
+  Future<void> _load() async {
+    await _preferences.load();
     await HistoryService().init();
-    if (mounted) {
-      setState(() {
-        _recentHistory = HistoryService().getHistory().take(6).toList();
-      });
+    if (_preferences.outputDirectory == null) {
+      _preferences.outputDirectory =
+          (await StorageService().getOutputDirectory()).path;
     }
+    _refresh();
   }
 
-  Future<void> _pickFiles() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: FormatRegistry.allSupportedExtensions,
-    );
-
-    if (result != null && result.files.isNotEmpty) {
-      final validFiles = result.files
-          .where((f) => f.path != null)
-          .map((f) => File(f.path!))
-          .toList();
-      _handleSelectedFiles(validFiles);
-    }
-  }
-
-  void _handleSelectedFiles(List<File> files) {
-    if (files.isEmpty) return;
-
-    for (final file in files) {
-      final fileItem = FileItem.fromFile(file);
-      final availableTargets = FormatRegistry.getAvailableTargetFormats(fileItem.extension);
-      final defaultTarget = availableTargets.first;
-
-      final job = ConversionJob(
-        id: const Uuid().v4(),
-        sourceFile: fileItem,
-        targetFormat: defaultTarget,
-        createdAt: DateTime.now(),
-      );
-
-      ConversionCoordinator().addJob(job);
-    }
-
-    _loadHistory();
+  void _refresh() {
+    if (mounted) setState(() {});
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isWindows = _capabilities?.isWindows ?? false;
-    final isAndroid = _capabilities?.isAndroid ?? false;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(Icons.swap_horiz_rounded, size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              'Converto',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-              ),
-              child: const Text(
-                '100% Offline',
-                style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Toggle Theme',
-            icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-            onPressed: widget.onToggleTheme,
-          ),
-          IconButton(
-            tooltip: 'Open Output Folder',
-            icon: const Icon(Icons.folder_open_outlined),
-            onPressed: () async {
-              final dir = await StorageService().getOutputDirectory();
-              await StorageService().showInFileManager(dir.path);
-            },
-          ),
-        ],
-      ),
-      body: DropTarget(
-        onDragEntered: (_) => setState(() => _isDragging = true),
-        onDragExited: (_) => setState(() => _isDragging = false),
-        onDragDone: (detail) {
-          setState(() => _isDragging = false);
-          final files = detail.files.map((f) => File(f.path)).toList();
-          _handleSelectedFiles(files);
-        },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Device status indicator
-              _buildDeviceBanner(isWindows, isAndroid),
-              const SizedBox(height: 20),
-
-              // Drop Zone / File Picker
-              _buildDropZone(theme),
-              const SizedBox(height: 24),
-
-              // Active Conversion Queue
-              _buildQueueSection(),
-              const SizedBox(height: 28),
-
-              // Quick Actions by Category
-              Text('Convert by Format Category', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _buildCategoryGrid(),
-              const SizedBox(height: 28),
-
-              // Recent Conversion History
-              Text('Recent Conversions', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _buildRecentHistoryList(),
-            ],
-          ),
-        ),
-      ),
-    );
+  void dispose() {
+    _job.removeListener(_refresh);
+    _job.dispose();
+    _search.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
-  Widget _buildDeviceBanner(bool isWindows, bool isAndroid) {
-    String osLabel = 'Desktop / Mobile';
-    if (isWindows) osLabel = 'Windows 64-bit';
-    if (isAndroid) osLabel = 'Android Device';
-
-    final hasLibreOffice = _capabilities?.hasLibreOfficeCLI ?? false;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.darkBorder),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isAndroid ? Icons.android : (isWindows ? Icons.desktop_windows : Icons.computer),
-            size: 18,
-            color: AppTheme.primaryCyan,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Target Platform: $osLabel',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-          const Spacer(),
-          Text(
-            hasLibreOffice ? 'LibreOffice Engine: Active' : 'Pure-Dart Engine: Active',
-            style: TextStyle(
-              fontSize: 11,
-              color: hasLibreOffice ? Colors.green : Colors.blueGrey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
+  void _notice(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Widget _buildDropZone(ThemeData theme) {
-    return GestureDetector(
-      onTap: _pickFiles,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-        decoration: BoxDecoration(
-          color: _isDragging
-              ? AppTheme.primaryBlue.withValues(alpha: 0.08)
-              : theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _isDragging ? AppTheme.primaryCyan : AppTheme.darkBorder,
-            width: _isDragging ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.upload_file_rounded, size: 28, color: AppTheme.primaryCyan),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Drop files here or click to browse',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Supports PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX), JPG, PNG, WEBP, CSV',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _intake(Iterable<String> paths) {
+    final batch = paths.toList();
+    _intakeTail = _intakeTail
+        .then((_) async {
+          if (!mounted || _job.busy) return;
+          final result = await FileIntake.collect(batch, existing: _paths);
+          if (!mounted || _job.busy) return;
+          setState(() {
+            _paths = result.paths.toList();
+            _recent = false;
+          });
+          if (result.issues.isNotEmpty)
+            _notice(result.issues.take(3).join('\n'));
+        })
+        .catchError((Object error) {
+          _notice('Could not add files: $error');
+        });
+    return _intakeTail;
   }
 
-  Widget _buildQueueSection() {
-    return StreamBuilder<List<ConversionJob>>(
-      stream: ConversionCoordinator().queueStream,
-      initialData: ConversionCoordinator().currentQueue,
-      builder: (context, snapshot) {
-        final queue = snapshot.data ?? [];
-        if (queue.isEmpty) return const SizedBox.shrink();
+  Future<void> _pick() async {
+    if (_job.busy) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: FormatRegistry.allSupportedExtensions,
+        dialogTitle: 'Choose files to work with',
+      );
+      if (result != null) await _intake(result.paths.whereType<String>());
+    } catch (e) {
+      _notice('Could not choose files: $e');
+    }
+  }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Future<void> _chooseOutput() async {
+    try {
+      final folder = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Save results to',
+      );
+      if (folder == null || !mounted) return;
+      setState(() => _preferences.outputDirectory = folder);
+      await _preferences.save();
+    } catch (e) {
+      _notice('Could not set output folder: $e');
+    }
+  }
+
+  Future<void> _open(String path, {bool reveal = false}) async {
+    try {
+      if (!File(path).existsSync() && !Directory(path).existsSync()) {
+        _notice('This file has been moved or deleted.');
+        return;
+      }
+      if (reveal) {
+        await FileUtils.revealInFileManager(path);
+      } else {
+        await FileUtils.openFile(path);
+      }
+    } catch (e) {
+      _notice('Could not open this file: $e');
+    }
+  }
+
+  Future<void> _settings() async {
+    final capabilities = await PlatformDetector.detect();
+    final webp = LocalProcess.find('cwebp');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('Settings'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Active Queue (${queue.length})',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                const Text(
+                  'Output folder',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  _preferences.outputDirectory ?? 'Loading…',
+                  style: const TextStyle(color: AppTheme.muted),
                 ),
                 TextButton(
-                  onPressed: () {
-                    ConversionCoordinator().clearCompletedJobs();
-                    _loadHistory();
+                  onPressed: () async {
+                    await _chooseOutput();
+                    update(() {});
                   },
-                  child: const Text('Clear Completed', style: TextStyle(fontSize: 12)),
+                  child: const Text('Choose folder'),
+                ),
+                const Divider(),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Remember recent results'),
+                  subtitle: const Text(
+                    'File names and paths are saved only on this Mac.',
+                  ),
+                  value: _preferences.rememberHistory,
+                  onChanged: (value) async {
+                    update(() => _preferences.rememberHistory = value);
+                    await _preferences.save();
+                  },
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await HistoryService().clearHistory();
+                    _refresh();
+                    _notice('Local history cleared. Your files are unchanged.');
+                  },
+                  child: const Text('Clear local history'),
+                ),
+                const Divider(),
+                const SizedBox(height: 18),
+                const Text(
+                  'Local engines',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                const Text('PDF & image processing: built in'),
+                Text(
+                  'LibreOffice: ${capabilities.hasLibreOfficeCLI ? 'available' : 'not installed (optional)'}',
+                ),
+                Text(
+                  'WebP encoder: ${webp != null ? 'available' : 'not installed (optional)'}',
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Optional helpers are never downloaded automatically. Some Office inputs and WebP output need a local helper.',
+                  style: TextStyle(color: AppTheme.muted, fontSize: 12),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            for (final job in queue)
-              Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _cli() => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Use the CLI'),
+      content: const SizedBox(
+        width: 430,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The app and CLI use the same local processing engine. If the Converto CLI is installed, run this in Terminal:',
+            ),
+            SizedBox(height: 18),
+            SelectableText(
+              'converto help',
+              style: TextStyle(fontFamily: 'Menlo', color: AppTheme.amber),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            await Clipboard.setData(const ClipboardData(text: 'converto help'));
+            if (context.mounted) Navigator.pop(context);
+            _notice('CLI command copied.');
+          },
+          child: const Text('Copy command'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final tools = ToolDefinition.tools
+        .where(
+          (tool) =>
+              (_category == ToolCategory.all || tool.category == _category) &&
+              '${tool.title} ${tool.description}'.toLowerCase().contains(
+                _query,
+              ) &&
+              _paths.every(
+                (path) => tool.accepts(FileUtils.getExtension(path)),
+              ),
+        )
+        .toList();
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyO, meta: true): _pick,
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
+          if (_tool == null) _searchFocus.requestFocus();
+        },
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (!_job.busy) setState(() => _tool = null);
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            _getCategoryIcon(job.sourceFile.formatInfo.category),
-                            size: 20,
-                            color: Color(job.sourceFile.formatInfo.colorValue),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${job.sourceFile.name}.${job.sourceFile.extension} → .${job.targetFormat}',
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          _buildJobStatusBadge(job),
-                        ],
-                      ),
-                      if (job.status == JobStatus.processing) ...[
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(value: job.progress, minHeight: 4),
-                      ],
-                      if (job.status == JobStatus.completed && job.resultFilePath != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              icon: const Icon(Icons.open_in_new, size: 14),
-                              label: const Text('Open File', style: TextStyle(fontSize: 12)),
-                              onPressed: () => StorageService().openFile(job.resultFilePath!),
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Icons.folder_open, size: 14),
-                              label: const Text('Show in Folder', style: TextStyle(fontSize: 12)),
-                              onPressed: () => StorageService().showInFileManager(job.resultFilePath!),
-                            ),
-                          ],
+                      const Icon(Icons.description_outlined, size: 26),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Converto',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -.6,
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 40),
+                      _nav(
+                        'Tools',
+                        !_recent,
+                        () => setState(() {
+                          _recent = false;
+                          _tool = null;
+                        }),
+                      ),
+                      const SizedBox(width: 12),
+                      _nav(
+                        'Recent',
+                        _recent,
+                        () => setState(() {
+                          _recent = true;
+                          _tool = null;
+                        }),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.circle, size: 7, color: AppTheme.teal),
+                      const SizedBox(width: 7),
+                      const Text(
+                        'Offline',
+                        style: TextStyle(color: AppTheme.teal, fontSize: 12),
+                      ),
+                      const SizedBox(width: 18),
+                      IconButton(
+                        tooltip: 'Settings',
+                        onPressed: _job.busy ? null : _settings,
+                        icon: const Icon(Icons.settings_outlined, size: 20),
+                      ),
                     ],
                   ),
                 ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildJobStatusBadge(ConversionJob job) {
-    switch (job.status) {
-      case JobStatus.queued:
-        return const Text('Queued', style: TextStyle(fontSize: 11, color: Colors.orange));
-      case JobStatus.processing:
-        return Text('${(job.progress * 100).toInt()}%', style: const TextStyle(fontSize: 11, color: AppTheme.primaryCyan));
-      case JobStatus.completed:
-        return const Icon(Icons.check_circle_rounded, size: 16, color: Colors.green);
-      case JobStatus.failed:
-        return const Icon(Icons.error_outline_rounded, size: 16, color: Colors.red);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  IconData _getCategoryIcon(FileCategory category) {
-    switch (category) {
-      case FileCategory.image:
-        return Icons.image_rounded;
-      case FileCategory.pdf:
-        return Icons.picture_as_pdf_rounded;
-      case FileCategory.document:
-        return Icons.description_rounded;
-      case FileCategory.spreadsheet:
-        return Icons.table_chart_rounded;
-      case FileCategory.presentation:
-        return Icons.slideshow_rounded;
-      default:
-        return Icons.insert_drive_file_outlined;
-    }
-  }
-
-  Widget _buildCategoryGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 2.4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        _buildCategoryCard('Image Studio', 'JPG, PNG, WEBP, Crop, Compress', Icons.image_outlined, Colors.blue),
-        _buildCategoryCard('PDF Suite', 'Merge, Split, Extract, Watermark', Icons.picture_as_pdf_outlined, Colors.redAccent),
-        _buildCategoryCard('Word Documents', 'DOCX, DOC, ODT to PDF', Icons.description_outlined, Colors.indigo),
-        _buildCategoryCard('Spreadsheets', 'XLSX, XLS, CSV to Table PDF', Icons.table_chart_outlined, Colors.green),
-      ],
-    );
-  }
-
-  Widget _buildCategoryCard(String title, String subtitle, IconData icon, Color color) {
-    return Card(
-      child: InkWell(
-        onTap: _pickFiles,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                const Divider(),
+                Expanded(
+                  child: DropTarget(
+                    enable: !_job.busy,
+                    onDragEntered: (_) => setState(() => _dragging = true),
+                    onDragExited: (_) => setState(() => _dragging = false),
+                    onDragDone: (details) {
+                      setState(() => _dragging = false);
+                      _intake(details.files.map((file) => file.path));
+                    },
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: _recent
+                              ? _recentView()
+                              : _tool == null
+                              ? _hub(tools)
+                              : ToolWorkspace(
+                                  key: ValueKey(_tool!.id),
+                                  tool: _tool!,
+                                  paths: _paths,
+                                  job: _job,
+                                  outputDirectory: _preferences.outputDirectory,
+                                  remember: _preferences.rememberHistory,
+                                  onBack: () => setState(() => _tool = null),
+                                  onPick: _pick,
+                                  onChooseOutput: _chooseOutput,
+                                  onPathsChanged: (paths) =>
+                                      setState(() => _paths = paths),
+                                  onOpen: _open,
+                                ),
+                        ),
+                        if (_dragging)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Container(
+                                margin: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.background.withValues(
+                                    alpha: .96,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.amber,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.file_download_outlined,
+                                        size: 40,
+                                        color: AppTheme.amber,
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'Drop files to add them',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Choose a tool when you’re ready.',
+                                        style: TextStyle(color: AppTheme.muted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Icon(icon, size: 20, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey), overflow: TextOverflow.ellipsis),
-                  ],
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Files stay on this device.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _cli,
+                        child: const Text(
+                          'Use CLI',
+                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRecentHistoryList() {
-    if (_recentHistory.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(
-          child: Text(
-            'No conversions yet. Drop a file above to begin.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+  Widget _nav(String label, bool selected, VoidCallback action) => TextButton(
+    onPressed: _job.busy ? null : action,
+    style: TextButton.styleFrom(
+      foregroundColor: selected ? AppTheme.amber : AppTheme.muted,
+    ),
+    child: Text(label),
+  );
+  Widget _hub(List<ToolDefinition> tools) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 900;
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          compact ? 28 : 52,
+          38,
+          compact ? 28 : 52,
+          36,
+        ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tools for your files.',
+                            style: Theme.of(context).textTheme.headlineLarge,
+                          ),
+                          const SizedBox(height: 9),
+                          const Text(
+                            'Convert, edit, and organize. All on your device.',
+                            style: TextStyle(color: AppTheme.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!compact) const SizedBox(width: 32),
+                    if (!compact) SizedBox(width: 270, child: _searchField()),
+                  ],
+                ),
+                if (compact) ...[const SizedBox(height: 22), _searchField()],
+                const SizedBox(height: 30),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.border),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _paths.isEmpty
+                            ? Icons.file_download_outlined
+                            : Icons.check_circle_outline,
+                        color: _paths.isEmpty ? AppTheme.muted : AppTheme.teal,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          _paths.isEmpty
+                              ? 'Drop files to see compatible tools'
+                              : '${_paths.length} files selected · showing compatible tools',
+                        ),
+                      ),
+                      if (_paths.isNotEmpty)
+                        TextButton(
+                          onPressed: () => setState(() => _paths = []),
+                          child: const Text('Clear'),
+                        ),
+                      const SizedBox(width: 12),
+                      OutlinedButton(
+                        onPressed: _pick,
+                        child: Text(
+                          _paths.isEmpty ? 'Choose files' : 'Add files',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 25),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: ToolCategory.values
+                      .map(
+                        (category) => ChoiceChip(
+                          label: Text(
+                            category == ToolCategory.all
+                                ? 'All tools'
+                                : '${category.name[0].toUpperCase()}${category.name.substring(1)}',
+                          ),
+                          selected: _category == category,
+                          labelStyle: TextStyle(
+                            color: _category == category
+                                ? AppTheme.amber
+                                : AppTheme.muted,
+                          ),
+                          onSelected: (_) =>
+                              setState(() => _category = category),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 24),
+                if (tools.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 50),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'No tools match this selection.',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Try another search, category or group of files.',
+                          style: TextStyle(color: AppTheme.muted),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() {
+                            _query = '';
+                            _search.clear();
+                            _category = ToolCategory.all;
+                            _paths = [];
+                          }),
+                          child: const Text('Reset filters'),
+                        ),
+                      ],
+                    ),
+                  ),
+                LayoutBuilder(
+                  builder: (context, grid) {
+                    final columns = grid.maxWidth >= 860
+                        ? 3
+                        : grid.maxWidth >= 540
+                        ? 2
+                        : 1;
+                    final width =
+                        (grid.maxWidth - 16 * (columns - 1)) / columns;
+                    return Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: tools
+                          .map(
+                            (tool) => SizedBox(
+                              width: width,
+                              height: 156,
+                              child: Material(
+                                color: AppTheme.surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: const BorderSide(
+                                    color: AppTheme.border,
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  onTap: () {
+                                    _job.reset();
+                                    setState(() => _tool = tool);
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(22),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          toolIcon(tool.id),
+                                          size: 27,
+                                          color: const Color(0xFFE4DFD4),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          tool.title,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          tool.description,
+                                          maxLines: 2,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       );
-    }
-
-    return Column(
+    },
+  );
+  Widget _searchField() => TextField(
+    controller: _search,
+    focusNode: _searchFocus,
+    onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+    decoration: InputDecoration(
+      hintText: 'Find a tool',
+      prefixIcon: const Icon(Icons.search, size: 20),
+      suffixIcon: _query.isEmpty
+          ? null
+          : IconButton(
+              tooltip: 'Clear search',
+              onPressed: () => setState(() {
+                _search.clear();
+                _query = '';
+              }),
+              icon: const Icon(Icons.close, size: 16),
+            ),
+    ),
+  );
+  Widget _recentView() {
+    final history = HistoryService().getHistory();
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 36),
       children: [
-        for (final item in _recentHistory)
-          Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
-              title: Text(
-                '${item.sourceName}.${item.sourceFormat} → .${item.targetFormat}',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              subtitle: Text(
-                '${FileUtils.formatBytes(item.fileSizeBytes)} • ${item.targetPath}',
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    onPressed: () => StorageService().openFile(item.targetPath),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.folder_open, size: 16),
-                    onPressed: () => StorageService().showInFileManager(item.targetPath),
-                  ),
-                ],
-              ),
+        Text(
+          'Recent results',
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Saved on this Mac. Your files are never uploaded.',
+          style: TextStyle(color: AppTheme.muted),
+        ),
+        const SizedBox(height: 28),
+        if (history.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Text(
+              'Your completed files will appear here. Choose a tool to get started.',
+            ),
+          ),
+        for (final item in history)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            leading: const Icon(
+              Icons.description_outlined,
+              color: AppTheme.muted,
+            ),
+            title: Text(p.basename(item.targetPath)),
+            subtitle: Text(
+              '${item.targetFormat.toUpperCase()} · ${FileUtils.formatBytes(item.fileSizeBytes)} · ${item.timestamp.toLocal().toString().substring(0, 16)}',
+            ),
+            onTap: () => _open(item.targetPath),
+            trailing: IconButton(
+              tooltip: 'Show in Finder',
+              onPressed: () => _open(item.targetPath, reveal: true),
+              icon: const Icon(Icons.folder_open_outlined),
             ),
           ),
       ],

@@ -7,32 +7,13 @@ void main() {
   runApp(const ConvertoApp());
 }
 
-class ConvertoApp extends StatefulWidget {
+class ConvertoApp extends StatelessWidget {
   const ConvertoApp({super.key});
-
   @override
-  State<ConvertoApp> createState() => _ConvertoAppState();
-}
-
-class _ConvertoAppState extends State<ConvertoApp> {
-  bool _isDark = true;
-
-  void _toggleTheme() {
-    setState(() => _isDark = !_isDark);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Converto',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
-      home: HomeDashboard(
-        onToggleTheme: _toggleTheme,
-        isDark: _isDark,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'Converto',
+    debugShowCheckedModeBanner: false,
+    theme: AppTheme.darkTheme,
+    home: const HomeDashboard(),
+  );
 }

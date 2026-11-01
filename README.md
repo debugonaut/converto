@@ -1,10 +1,10 @@
-# Converto CLI
+# Converto
 
 **Convert and edit files on your own machine. Offline, private, and without conversion quotas.**
 
 Converto is a local file conversion toolkit for documents, images, spreadsheets, presentations, and PDFs. Use ordinary terminal commands, open the interactive slash-command menu, or drop file paths into the terminal. Files are processed on your device, with no upload service, account, or telemetry client.
 
-The CLI has **25 operations**, **21 registered source extensions**, and **114 tested source/target pairs**. Native builds and automated verification run on **macOS arm64, Windows x64, and Linux x64**. CLI reliability is the current focus; GUI development is deferred until the CLI is established end to end.
+The CLI has **25 operations**, **21 registered source extensions**, and **114 tested source/target pairs**. Native builds and automated verification run on **macOS arm64, Windows x64, and Linux x64**. A native macOS app now adds a searchable tool hub and focused workspaces on top of the same local engine. Windows and Linux GUI builds are not yet part of this preview.
 
 [Installation](#installation) · [Usage](#usage) · [Operations](#all-25-operations) · [Formats](#supported-formats) · [Architecture](#architecture) · [Analytics](#verified-analytics) · [Development](#development-and-verification)
 
@@ -20,6 +20,41 @@ The CLI has **25 operations**, **21 registered source extensions**, and **114 te
 | **No signups** | Running the CLI requires no Converto account, login, or license activation. Accessing this currently private GitHub repository or its CI artifacts requires repository access. |
 | **No artificial file-size cap** | There is no product upload limit or application file-size quota. RAM, disk, codec dimensions, helper timeouts, and OS limits still apply; several parsers hold whole files in memory. |
 | **Fast local processing** | No server round trip. Measured samples improved JPEG-to-PDF by about **45×** and text-to-PDF by about **15×**; other measured workloads were effectively unchanged. See the benchmark conditions below. |
+
+## macOS app preview
+
+The native Flutter app offers **19 file tools**: conversion, image editing, PDF
+merge/split/extract/organize, page rotation/crop/numbers/watermark, compression,
+redaction, encryption/unlock, PDF/A, Office export, text extraction and metadata.
+Search or filter the tool catalog, add files with Finder drag and drop or the
+native picker, then explicitly run a tool. Drops never start processing.
+
+Jobs run in a background isolate, stage outputs privately, preserve originals,
+and clean up failed/cancelled batches. Repeated drops deduplicate file paths.
+Cancellation waits for the current local engine call to finish. Optional local
+history can be disabled or cleared in Settings. The app performs no runtime
+network requests, signup, uploads, telemetry or codec downloads.
+
+Download `macos-app-preview` from a successful workflow run, extract the inner
+`Converto-macOS-preview.zip`, and open `Converto.app`. This is an **ad-hoc signed,
+not notarized developer preview**, targeting macOS 13+; validate the artifact on
+your Mac before distribution. Apple distribution signing/notarization is a
+separate release step. Setup/builds require network access for dependencies.
+
+Build from source on a Mac with Flutter, full Xcode and CocoaPods:
+
+```sh
+flutter pub get
+flutter run -d macos
+# Or build the release app:
+flutter build macos --release
+```
+
+The macOS runner, UI and shared executor are in `macos/`, `lib/ui/` and
+`lib/services/gui/`. Run `dart run tool/audit_gui.dart` for machine-readable
+per-tool results under `build/audit/gui/results.json`; widget and worker tests
+run with the ordinary Flutter test suite. The existing CLI audit below remains
+separate from GUI and native-window validation.
 
 ## Installation
 
