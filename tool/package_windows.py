@@ -76,14 +76,16 @@ def main():
             'root=Path(sys.argv[1]); search=os.add_dll_directory(str(root)); '
             'libraries=[ctypes.WinDLL(str(root/name)) for name in sys.argv[2:]]'
         )
+        env = dict(os.environ)
+        system = Path(env['SystemRoot'])
+        env['PATH'] = os.pathsep.join((str(extracted), str(system / 'System32'), str(system)))
         subprocess.run([sys.executable, '-c', loader, str(extracted),
                         'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll',
                         'flutter_windows.dll', 'desktop_drop_plugin.dll', 'pdf_oxide.dll'],
-                       cwd=temporary, timeout=30, check=True,
+                       cwd=temporary, env=env, timeout=30, check=True,
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # First Flutter frame, no visible app window or interactive UI automation.
         # The source/build directories are not the current working directory.
-        env = dict(os.environ)
         env['CONVERTO_DATA_DIR'] = str(Path(temporary) / 'profile')
         env['CONVERTO_OUTPUT_DIR'] = str(Path(temporary) / 'outputs')
         env['CONVERTO_HISTORY'] = 'off'
@@ -97,6 +99,7 @@ def main():
             'sha256': digest(args.output), 'verifiedBinaryFiles': binaries,
             'allFilesUnchangedAfterZip': True, 'privateRuntimeDllLoads': 'pass',
             'firstFlutterFrame': 'pass', 'vcRuntimeAppLocal': True,
+            'startupPath': 'app directory and Windows system directories only',
             'signing': 'unsigned developer preview',
         }
         args.report.write_text(json.dumps(report, indent=2), encoding='utf-8')
@@ -104,4 +107,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as failure:
+        for diagnostic in (failure.stdout, failure.stderr):
+            if diagnostic:
+                print(diagnostic.decode('utf-8', errors='replace') if isinstance(diagnostic, bytes) else diagnostic,
+                      file=sys.stderr)
+        raise
