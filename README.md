@@ -35,9 +35,12 @@ Cancellation waits for the current local engine call to finish. Optional local
 history can be disabled or cleared in Settings. The app performs no runtime
 network requests, signup, uploads, telemetry or codec downloads.
 
-Download `macos-app-preview` from a successful [native workflow run](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml), extract the inner
-`Converto-macOS-preview.zip`, and open `Converto.app`. This is an **ad-hoc signed,
-not notarized developer preview**, targeting macOS 13+; validate the artifact on
+Download `macos-app-AppleSilicon` (M-series Macs) or `macos-app-Intel` from a successful [native workflow run](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml).
+Extract the matching `Converto-macOS-arm64.zip` or `Converto-macOS-x86_64.zip`,
+then open `Converto.app`. Separate CPU downloads preserve every offline engine
+while avoiding the unused architecture. The measured Apple Silicon ZIP is
+**19.6 MiB**, down from **39.9 MiB**; see the [size audit](docs/audit/2026-11-01-macos-size.md).
+This is an **ad-hoc signed, not notarized developer preview**, targeting macOS 13+; validate the artifact on
 your Mac before distribution. Apple distribution signing/notarization is a
 separate release step. Setup/builds require network access for dependencies.
 

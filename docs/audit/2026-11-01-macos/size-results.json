@@ -1,0 +1,27 @@
+{
+  "universalBundleBytes": 99900039,
+  "packages": [
+    {
+      "architecture": "arm64",
+      "archive": "Converto-macOS-arm64.zip",
+      "bundleBytes": 49560204,
+      "archiveBytes": 20562557,
+      "sha256": "78b8e5705009f4ffc68608d4a3a69f4cd948e11113212e9ff158ca781a0209c4",
+      "verifiedExecutableFiles": 6,
+      "executableSectionsUnchanged": true,
+      "signing": "ad-hoc developer preview; not notarized"
+    },
+    {
+      "architecture": "x86_64",
+      "archive": "Converto-macOS-x86_64.zip",
+      "bundleBytes": 53325194,
+      "archiveBytes": 22336609,
+      "sha256": "e990cd57b265783b38649e30c1bf17a03c7ec9438a3fc6bfe8ea7534e2999310",
+      "verifiedExecutableFiles": 6,
+      "executableSectionsUnchanged": true,
+      "signing": "ad-hoc developer preview; not notarized"
+    }
+  ],
+  "sourceCommit": "221318f4e5560c9834e75cf7178afd9bcea52933",
+  "universalArchiveBytes": 41867233
+}
