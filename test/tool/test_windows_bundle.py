@@ -4,7 +4,7 @@ import struct
 import tempfile
 import unittest
 import zipfile
-from tool.windows_bundle import REQUIRED, X64, pe_machine, validate, verify_archive
+from tool.windows_bundle import REQUIRED, X64, pe_machine, runtime_environment, validate, verify_archive
 
 
 def pe(machine=X64):
@@ -61,14 +61,25 @@ class WindowsBundleTests(unittest.TestCase):
         self.assertIn('pdf_oxide.dll', actual)
 
     def test_wrong_aot_snapshot_architecture_is_rejected(self):
-        (self.bundle / 'data/app.so').write_bytes(elf(183))
-        with self.assertRaisesRegex(ValueError, 'Incorrect Windows architecture'):
-            validate(self.bundle)
+        for machine in (183, X64):
+            (self.bundle / 'data/app.so').write_bytes(elf(machine))
+            with self.assertRaisesRegex(ValueError, 'Incorrect Windows architecture'):
+                validate(self.bundle)
 
     def test_truncated_aot_snapshot_is_rejected(self):
         (self.bundle / 'data/app.so').write_bytes(b'\x7fELF\x02\x01')
         with self.assertRaisesRegex(ValueError, 'Invalid 64-bit'):
             validate(self.bundle)
+
+    def test_uppercase_windows_environment_uses_only_app_and_system_path(self):
+        env = runtime_environment(self.bundle, {'SYSTEMROOT': 'C:/Windows', 'Path': 'developer-toolchain', 'Example': 'retained'})
+        self.assertIn(str(self.bundle), env['PATH'])
+        self.assertIn('System32', env['PATH'])
+        self.assertNotIn('developer-toolchain', env['PATH'])
+        self.assertEqual(env['SYSTEMROOT'], 'C:/Windows')
+        self.assertEqual(env['EXAMPLE'], 'retained')
+        mixed = runtime_environment(self.bundle, {'SystemRoot': 'C:/Windows'})
+        self.assertEqual(mixed['SYSTEMROOT'], 'C:/Windows')
 
     def test_missing_native_engine_is_rejected(self):
         (self.bundle / 'pdf_oxide.dll').unlink()

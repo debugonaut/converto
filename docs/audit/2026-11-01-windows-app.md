@@ -25,7 +25,7 @@ or service is introduced.
 ## Checks and evidence
 
 Local: 130 Flutter regressions pass; static analysis reports no issues; all
-17 Mac/Windows package integrity tests pass. Windows CI runs the same checks,
+18 Mac/Windows package integrity tests pass. Windows CI runs the same checks,
 then the 32-case real-engine GUI audit, native compile and extracted startup
 probe. Source tests cover missing PDF/CRT files, mixed architectures, changed
 resources, truncated binaries and unsafe ZIP paths/case aliases.

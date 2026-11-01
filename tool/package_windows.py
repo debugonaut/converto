@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 
 from package_cli import third_party_notices
-from windows_bundle import digest, files, validate, verify_archive
+from windows_bundle import digest, files, runtime_environment, validate, verify_archive
 
 
 def locate_crt():
@@ -76,9 +76,7 @@ def main():
             'root=Path(sys.argv[1]); search=os.add_dll_directory(str(root)); '
             'libraries=[ctypes.WinDLL(str(root/name)) for name in sys.argv[2:]]'
         )
-        env = dict(os.environ)
-        system = Path(env['SystemRoot'])
-        env['PATH'] = os.pathsep.join((str(extracted), str(system / 'System32'), str(system)))
+        env = runtime_environment(extracted, os.environ)
         subprocess.run([sys.executable, '-c', loader, str(extracted),
                         'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll',
                         'flutter_windows.dll', 'desktop_drop_plugin.dll', 'pdf_oxide.dll'],

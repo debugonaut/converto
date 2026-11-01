@@ -1,5 +1,6 @@
 """Portable Windows bundle validation; no runtime downloads or installers."""
 import hashlib
+import os
 from pathlib import Path
 import struct
 import zipfile
@@ -36,7 +37,19 @@ def aot_machine(path):
     if len(header) < 64 or header[:6] != b'\x7fELF\x02\x01':
         raise ValueError(f'Invalid 64-bit little-endian AOT snapshot: {path}')
     machine = struct.unpack_from('<H', header, 18)[0]
-    return X64 if machine == 62 else machine
+    return X64 if machine == 62 else -1
+
+
+def runtime_environment(bundle, environment):
+    # os.environ is case-insensitive on Windows; dict(os.environ) is not.
+    env = {key.upper(): value for key, value in environment.items()}
+    windows = env.get('SYSTEMROOT') or env.get('WINDIR')
+    if not windows:
+        raise ValueError('Windows system directory is missing from the build environment')
+    system = Path(windows)
+    env['SYSTEMROOT'] = windows
+    env['PATH'] = os.pathsep.join((str(bundle), str(system / 'System32'), str(system)))
+    return env
 
 
 def files(root):
