@@ -98,7 +98,7 @@ def main():
         payload = stage / 'opt/converto'
         shutil.copytree(app, payload)
         (stage / 'usr/bin').mkdir(parents=True)
-        launcher = stage / 'usr/bin/converto'
+        launcher = stage / 'usr/bin/converto-gui'
         launcher.write_text('#!/bin/sh\nexec /opt/converto/converto "$@"\n')
         launcher.chmod(0o755)
         desktop = stage / 'usr/share/applications'
@@ -151,6 +151,8 @@ def main():
             'portableFirstFrameAndPickerCancellation': 'pass',
             'debianFirstFrameAndPickerCancellation': 'pass',
             'bundledPdfWatermarkAndReadbackBothPackages': 'pass',
+            'watermarkChangesRenderedPixels': 'pass',
+            'desktopLaunch': '/opt/converto/converto; optional converto-gui command preserves CLI name',
             'runtime': 'Relocated bundles, isolated profile, only system PATH, Xvfb software GL',
             'nativeDragDropManual': 'pending', 'waylandAndKdeManual': 'pending',
         }

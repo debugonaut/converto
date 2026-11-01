@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:image/image.dart' as img;
 import 'package:pdf/widgets.dart' as pw;
 import '../../models/gui/tool_definition.dart';
 import '../pdf/pdf_engine.dart';
@@ -30,8 +32,24 @@ Future<void> runLinuxStartupProbe() async {
     );
     final output = File(result.outputs.single);
     if (await PdfEngine.pageCount(output) != 1 ||
-        !(await PdfEngine.extractText(output)).contains('LOCAL')) {
+        !(await PdfEngine.extractText(output)).contains('Offline source')) {
       throw StateError('Packaged PDF engine output verification');
+    }
+    Future<String> pixels(File pdf, String directory) async {
+      final pages = await PdfEngine.renderPages(
+        sourceFile: pdf,
+        dpi: 24,
+        maxPages: 1,
+        outputDirectory: directory,
+      );
+      final image = img.decodePng(await pages.single.readAsBytes());
+      if (image == null) throw StateError('Packaged PDF rendering');
+      return base64Encode(image.getBytes());
+    }
+
+    if (await pixels(source, '${scratch.path}/before') ==
+        await pixels(output, '${scratch.path}/after')) {
+      throw StateError('Watermark did not change rendered pixels');
     }
     stdout.writeln('CONVERTO_LINUX_BUNDLED_ENGINE_OK');
   } catch (error) {

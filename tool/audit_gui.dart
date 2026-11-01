@@ -141,6 +141,32 @@ Future<void> main() async {
             'Chosen output name was not applied',
           );
           switch (id) {
+            case ToolId.watermark:
+              Future<String> pixels(File file, String directory) async {
+                final pages = await PdfEngine.renderPages(
+                  sourceFile: file,
+                  dpi: 24,
+                  maxPages: 1,
+                  outputDirectory: p.join(root.path, directory),
+                );
+                final image = img.decodePng(await pages.single.readAsBytes());
+                check(image != null, 'Watermark render failed');
+                return base64Encode(image!.getBytes());
+              }
+              check(
+                await pixels(source, 'watermark-before') !=
+                    await pixels(
+                      File(result.outputs.single),
+                      'watermark-after',
+                    ),
+                'Watermark must change rendered page pixels',
+              );
+              check(
+                (await PdfEngine.extractText(
+                  File(result.outputs.single),
+                )).contains('Page 1'),
+                'Watermark must preserve original text',
+              );
             case ToolId.merge:
               check(
                 await PdfEngine.pageCount(File(result.outputs.single)) == 4,
