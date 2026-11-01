@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:converto/main.dart';
@@ -12,6 +13,28 @@ import 'package:converto/services/gui/gui_executor.dart';
 import 'package:converto/ui/screens/tool_workspace.dart';
 
 void main() {
+  testWidgets('native command shortcut focuses the tool search', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1180, 840);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const ConvertoApp());
+    await tester.pumpAndSettle();
+    final modifier = Platform.isMacOS
+        ? LogicalKeyboardKey.metaLeft
+        : LogicalKeyboardKey.controlLeft;
+    await tester.sendKeyDownEvent(modifier);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(modifier);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
+  });
+
   testWidgets(
     'hub searches, filters and opens a workspace without processing',
     (tester) async {

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -11,8 +12,10 @@ class AppTheme {
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    platform: TargetPlatform.macOS,
-    fontFamily: '.AppleSystemUIFont',
+    platform: Platform.isWindows
+        ? TargetPlatform.windows
+        : TargetPlatform.macOS,
+    fontFamily: Platform.isWindows ? 'Segoe UI' : '.AppleSystemUIFont',
     scaffoldBackgroundColor: background,
     colorScheme: const ColorScheme.dark(
       primary: amber,

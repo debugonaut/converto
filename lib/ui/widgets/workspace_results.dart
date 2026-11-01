@@ -180,7 +180,11 @@ class WorkspaceResults extends StatelessWidget {
                         icon: const Icon(Icons.open_in_new, size: 18),
                       ),
                       IconButton(
-                        tooltip: 'Show in Finder',
+                        tooltip: Platform.isWindows
+                            ? 'Show in Explorer'
+                            : Platform.isMacOS
+                            ? 'Show in Finder'
+                            : 'Show in file manager',
                         onPressed: () => onOpen(output, reveal: true),
                         icon: const Icon(Icons.folder_open_outlined, size: 19),
                       ),

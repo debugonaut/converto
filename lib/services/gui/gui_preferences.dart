@@ -6,12 +6,14 @@ import '../storage_service.dart';
 class GuiPreferences {
   String? outputDirectory;
   bool rememberHistory = true;
+  static String dataDirectory(Map<String, String> environment) =>
+      environment['CONVERTO_DATA_DIR'] ??
+      p.join(
+        environment['HOME'] ?? environment['USERPROFILE'] ?? '.',
+        '.converto',
+      );
   File get _file => File(
-    p.join(
-      Platform.environment['CONVERTO_DATA_DIR'] ??
-          p.join(Platform.environment['HOME'] ?? '.', '.converto'),
-      'desktop_preferences.json',
-    ),
+    p.join(dataDirectory(Platform.environment), 'desktop_preferences.json'),
   );
   Future<void> load() async {
     try {

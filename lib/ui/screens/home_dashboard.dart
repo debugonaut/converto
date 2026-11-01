@@ -184,7 +184,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Remember recent results'),
                   subtitle: const Text(
-                    'File names and paths are saved only on this Mac.',
+                    'File names and paths are saved only on this device.',
                   ),
                   value: _preferences.rememberHistory,
                   onChanged: (value) async {
@@ -286,8 +286,16 @@ class _HomeDashboardState extends State<HomeDashboard> {
         .toList();
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyO, meta: true): _pick,
-        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
+        SingleActivator(
+          LogicalKeyboardKey.keyO,
+          meta: Platform.isMacOS,
+          control: !Platform.isMacOS,
+        ): _pick,
+        SingleActivator(
+          LogicalKeyboardKey.keyF,
+          meta: Platform.isMacOS,
+          control: !Platform.isMacOS,
+        ): () {
           if (_tool == null) _searchFocus.requestFocus();
         },
         const SingleActivator(LogicalKeyboardKey.escape): () {
@@ -722,7 +730,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Saved on this Mac. Your files are never uploaded.',
+          'Saved on this device. Your files are never uploaded.',
           style: TextStyle(color: AppTheme.muted),
         ),
         const SizedBox(height: 28),
@@ -746,7 +754,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
             onTap: () => _open(item.targetPath),
             trailing: IconButton(
-              tooltip: 'Show in Finder',
+              tooltip: Platform.isWindows
+                  ? 'Show in Explorer'
+                  : Platform.isMacOS
+                  ? 'Show in Finder'
+                  : 'Show in file manager',
               onPressed: () => _open(item.targetPath, reveal: true),
               icon: const Icon(Icons.folder_open_outlined),
             ),

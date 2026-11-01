@@ -34,7 +34,7 @@ jobs:
       - run: flutter analyze --no-pub
       - run: dart tool/verify_cli.dart
       - run: node --test test/launcher_test.cjs
-      - run: python -m unittest discover -s test/tool -p test_macos_bundle.py
+      - run: python -m unittest discover -s test/tool -p 'test_*bundle.py'
       - run: python -m pip install -r tool/audit-requirements.txt
       - name: Audit self-contained runtime
         shell: bash
@@ -42,9 +42,28 @@ jobs:
       - name: Check real terminal behavior
         shell: bash
         run: python tool/test_terminal.py --binary "$(cat build/cli-path.txt)" --output build/audit/terminal
-      - name: Audit GUI execution and transactional outputs on Mac
-        if: runner.os == 'macOS'
+      - name: Audit GUI execution and transactional outputs on desktop
+        if: runner.os == 'macOS' || runner.os == 'Windows'
         run: dart run tool/audit_gui.dart
+      - name: Build native Windows app
+        if: runner.os == 'Windows'
+        run: flutter build windows --release --no-pub
+      - name: Package and verify portable Windows app
+        if: runner.os == 'Windows'
+        run: python tool/package_windows.py
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: windows-app-x64
+          compression-level: 0
+          path: Converto-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: windows-app-audit
+          path: |
+            build/audit/windows-app/package.json
+            build/audit/gui/results.json
       - name: Build native Mac app
         if: runner.os == 'macOS'
         run: flutter build macos --release --no-pub
