@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
 import 'package:converto/core/constants/format_types.dart';
 import 'package:converto/core/platform/platform_detector.dart';
 import 'package:converto/core/utils/file_utils.dart';
@@ -46,12 +47,13 @@ void main() {
     });
 
     test('listSupportedFiles discovers valid files and skips hidden files', () {
-      final img = File('${tempDir.path}/photo.png')..writeAsStringSync('dummy');
-      final doc = File('${tempDir.path}/report.pdf')
+      final img = File(p.join(tempDir.path, 'photo.png'))
         ..writeAsStringSync('dummy');
-      final hidden = File('${tempDir.path}/.hidden.png')
+      final doc = File(p.join(tempDir.path, 'report.pdf'))
         ..writeAsStringSync('dummy');
-      final unsupported = File('${tempDir.path}/data.xyz')
+      final hidden = File(p.join(tempDir.path, '.hidden.png'))
+        ..writeAsStringSync('dummy');
+      final unsupported = File(p.join(tempDir.path, 'data.xyz'))
         ..writeAsStringSync('dummy');
 
       final found = FileUtils.listSupportedFiles(tempDir);

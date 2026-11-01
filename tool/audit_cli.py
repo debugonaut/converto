@@ -25,6 +25,14 @@ from PIL import Image, ImageChops, ImageStat, ImageFilter
 import pymupdf as fitz
 
 
+def quote_terminal_arg(value):
+    """Quote text sent to the interactive CLI, not process argv."""
+    value = str(value)
+    if os.name == 'nt':
+        return "'" + value.replace("'", "''") + "'"
+    return shlex.quote(value)
+
+
 def make_fixtures(directory):
     directory.mkdir(parents=True, exist_ok=True)
     image = Image.new('RGBA', (64, 48))
@@ -185,7 +193,7 @@ class Audit:
         record = dict(name=name, group=group, args=[str(a) for a in args])
         try:
             r = subprocess.run([str(self.binary), *record['args']], input=stdin,
-                               text=True, capture_output=True, timeout=timeout,
+                               text=True, encoding='utf-8', capture_output=True, timeout=timeout,
                                cwd=self.output, env=self.env | (env or {}))
             record.update(exit_code=r.returncode, stdout=r.stdout, stderr=r.stderr)
             assert (r.returncode == 0) if expected == 0 else (r.returncode != 0), f'Unexpected exit {r.returncode}'
@@ -327,10 +335,14 @@ class Audit:
             else:
                 self.case('drop-' + source.name,['interactive'], lambda r,d=dest: validate(d,'pdf'), stdin=line,group='drop')
         for name in ['space name.png', "apostrophe's.png", 'quote"name.png', 'a(1)&[2]#$.png', 'unicode-é-你好.png', '00~real01~.png']:
+            if os.name == 'nt' and '"' in name:
+                self.results.append(dict(name='escaped-'+name, group='drop', status='skip',
+                                         error='Windows does not permit double quotes in filenames; parser-only coverage remains in the Dart tests.'))
+                continue
             source = self.fixtures / name
             shutil.copyfile(image, source)
             dest = self.output / ('escaped-' + hashlib.sha256(name.encode()).hexdigest()[:8] + '.pdf')
-            escaped = ''.join('\\' + c if c in " \\'\"()&[]#$;" else c for c in str(source))
+            escaped = quote_terminal_arg(source) if os.name == 'nt' else ''.join('\\' + c if c in " \\'\"()&[]#$;" else c for c in str(source))
             self.case('escaped-' + name,['interactive'],lambda r,d=dest: validate(d,'pdf'),stdin=f'/convert {escaped} pdf -o "{dest}"\n/exit\n',group='drop')
         for ext in ['png','jpg','jpeg','webp','bmp','gif','tiff','ico','pdf','docx','doc','odt','xlsx','xls','pptx','ppt']:
             corrupt = self.fixtures / f'corrupt.{ext}'
@@ -365,7 +377,7 @@ class Audit:
         for ext in ['txt','csv','docx','pptx']:
             source=self.fixtures/f'unicode-content.{ext}'
             if ext in ['txt','csv']:
-                source.write_text('Audit Alpha 你好\n' if ext=='txt' else 'Name,Value\n你好,12\n')
+                source.write_text('Audit Alpha 你好\n' if ext=='txt' else 'Name,Value\n你好,12\n', encoding='utf-8')
             else:
                 original=self.fixtures/('document.docx' if ext=='docx' else 'slides.pptx')
                 with zipfile.ZipFile(original) as old,zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
@@ -382,7 +394,7 @@ class Audit:
         for source in sources:
             target='png' if source.suffix=='.pdf' else 'pdf'
             directory=self.output/'bare-drops'/source.name
-            line=shlex.quote(str(source))+'\n1\n'+target+'\n/exit\n'
+            line=quote_terminal_arg(source)+'\n1\n'+target+'\n/exit\n'
             needs_helper=source.suffix in ['.doc','.rtf','.odt','.xls','.ppt','.odp']
             if self.profile=='standalone' and needs_helper:
                 self.case('bare-drop-'+source.name,['interactive'],expected=1,stdin=line,group='drop',
@@ -416,7 +428,7 @@ class Audit:
                 elif command=='protect':
                     with fitz.open(dest) as doc: require(doc.needs_pass,'Slash protect is unencrypted')
                 else: validate(dest,dest.suffix[1:])
-            line='/'+' '.join(shlex.quote(x) for x in tokens)+'\n/exit\n'
+            line='/'+' '.join(quote_terminal_arg(x) for x in tokens)+'\n/exit\n'
             self.case('slash-'+tokens[0],['interactive'],check,stdin=line,group='slash')
         dest=self.output/'slash-convert.pdf'
         self.case('slash-convert',['interactive'],lambda r:validate(dest,'pdf',1),
@@ -474,9 +486,17 @@ class Audit:
         folder=self.fixtures/'drop-folder';folder.mkdir()
         shutil.copyfile(image,folder/'a.png');shutil.copyfile(image,folder/'b.png')
         (folder/'.hidden.png').write_bytes(b'corrupt hidden');(folder/'unsupported.zzz').write_text('skip')
-        if os.name!='nt':os.symlink(folder,folder/'cycle')
+        has_cycle = False
+        try:
+            os.symlink(folder,folder/'cycle',target_is_directory=True)
+            has_cycle = True
+        except OSError:
+            if os.name != 'nt':
+                raise
+            self.results.append(dict(name='folder-symlink-cycle', group='drop', status='skip',
+                                     error='Windows runner does not grant symlink creation privileges.'))
         dest=self.output/'folder.pdf'
-        self.case('folder-snapshot-no-symlink-loop',[folder,'pdf','-o',dest],lambda r:validate(dest,'pdf',2),group='drop')
+        self.case('folder-snapshot-no-symlink-loop' if has_cycle else 'folder-snapshot',[folder,'pdf','-o',dest],lambda r:validate(dest,'pdf',2),group='drop')
         dest=self.output/'convert-folder.pdf'
         self.case('convert-command-folder',['convert',folder,'-t','pdf','-o',dest],lambda r:validate(dest,'pdf',2),group='drop')
         dest=self.output/'duplicate.pdf'
