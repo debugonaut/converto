@@ -40,7 +40,11 @@ class WindowsBundleTests(unittest.TestCase):
                     package.writestr(name, replace[name] if replace and name in replace else path.read_bytes())
             if extra:
                 for name, payload in extra.items():
-                    package.writestr(name, payload)
+                    member = zipfile.ZipInfo(name)
+                    # ZipInfo normalizes backslashes on Windows at construction.
+                    # Preserve the raw hostile name to exercise the ZIP reader.
+                    member.filename = name
+                    package.writestr(member, payload)
         return output
 
     def test_complete_x64_runtime_and_aot_are_verified(self):

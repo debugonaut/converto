@@ -58,9 +58,9 @@ def verify_archive(archive, source, extracted):
     with zipfile.ZipFile(archive) as package:
         seen = set()
         for member in package.infolist():
-            name = member.filename
+            name = member.orig_filename
             canonical = name.lower()
-            if (name.startswith(('/', '\\')) or '\\' in name or ':' in name or
+            if (name != member.filename or '\0' in name or name.startswith(('/', '\\')) or '\\' in name or ':' in name or
                     '..' in name.split('/') or canonical in seen):
                 raise ValueError(f'Unsafe or duplicate archive member: {name}')
             seen.add(canonical)
