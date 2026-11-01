@@ -17,6 +17,7 @@ class PdfPageControls extends StatefulWidget {
   final LocalPreviewService service;
   final TextEditingController expression;
   final bool organize;
+  final List<int> rotations;
   final bool selectable;
   final bool enabled;
   final ValueChanged<List<int>>? onRotations;
@@ -28,6 +29,7 @@ class PdfPageControls extends StatefulWidget {
     required this.service,
     required this.expression,
     this.organize = false,
+    this.rotations = const [],
     this.selectable = false,
     this.enabled = true,
     this.onRotations,
@@ -45,7 +47,7 @@ class _PdfPageControlsState extends State<PdfPageControls> {
   @override
   void initState() {
     super.initState();
-    _sync();
+    _sync(restoreRotations: true);
     widget.expression.addListener(_expressionChanged);
   }
 
@@ -55,9 +57,10 @@ class _PdfPageControlsState extends State<PdfPageControls> {
     if (old.expression != widget.expression) {
       old.expression.removeListener(_expressionChanged);
       widget.expression.addListener(_expressionChanged);
-      _sync();
+      _sync(restoreRotations: true);
     }
-    if (old.pageCount != widget.pageCount || old.path != widget.path) _sync();
+    if (old.pageCount != widget.pageCount || old.path != widget.path)
+      _sync(restoreRotations: true);
   }
 
   @override
@@ -66,7 +69,7 @@ class _PdfPageControlsState extends State<PdfPageControls> {
     super.dispose();
   }
 
-  void _sync() {
+  void _sync({bool restoreRotations = false}) {
     var indices = List.generate(widget.pageCount, (i) => i);
     if (widget.expression.text.trim().isNotEmpty) {
       try {
@@ -81,7 +84,16 @@ class _PdfPageControlsState extends State<PdfPageControls> {
       indices = [];
     }
     if (widget.organize) {
-      _pages = indices.map((page) => _PageItem(_nextId++, page)).toList();
+      _pages = [
+        for (var i = 0; i < indices.length; i++)
+          _PageItem(
+            _nextId++,
+            indices[i],
+            restoreRotations && widget.rotations.length == indices.length
+                ? widget.rotations[i]
+                : 0,
+          ),
+      ];
     } else {
       _selected = indices.toSet();
       _pages = List.generate(
@@ -92,7 +104,7 @@ class _PdfPageControlsState extends State<PdfPageControls> {
   }
 
   void _expressionChanged() {
-    if (!_emitting && mounted) setState(_sync);
+    if (!_emitting && mounted) setState(() => _sync());
   }
 
   void _emit() {

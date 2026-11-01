@@ -365,4 +365,56 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets(
+    'switching batch preview retains the visible per-page rotation plan',
+    (tester) async {
+      final expression = TextEditingController(text: '2,1');
+      final service = LocalPreviewService();
+      addTearDown(expression.dispose);
+      addTearDown(service.dispose);
+      Future<void> show(String path) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.darkTheme,
+            home: Scaffold(
+              body: PdfPageControls(
+                path: path,
+                pageCount: 2,
+                service: service,
+                expression: expression,
+                organize: true,
+                rotations: const [90, 180],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await show('/tmp/first.pdf');
+      expect(
+        tester
+            .widgetList<RotatedBox>(find.byType(RotatedBox))
+            .map((e) => e.quarterTurns),
+        [1, 2],
+      );
+      await show('/tmp/second.pdf');
+      expect(
+        tester
+            .widgetList<RotatedBox>(find.byType(RotatedBox))
+            .map((e) => e.quarterTurns),
+        [1, 2],
+      );
+      // Manually editing the page expression intentionally resets visual rotations.
+      expression.text = '1,2';
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widgetList<RotatedBox>(find.byType(RotatedBox))
+            .map((e) => e.quarterTurns),
+        [0, 0],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

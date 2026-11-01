@@ -86,7 +86,7 @@ and the local format engine.
 ## Verification
 
 - `flutter analyze --no-pub`: no issues.
-- `dart tool/verify_cli.dart`: full CLI bundle build; **126/126** Flutter regressions pass.
+- `dart tool/verify_cli.dart`: full CLI bundle build; **127/127** Flutter regressions pass.
 - `dart run tool/audit_gui.dart`: **32/32** real-engine checks; every saving tool
   receives a custom output name. Checks include rollback, cancellation,
   collisions, full PDF text readability, output dimensions and original bytes.
@@ -101,7 +101,8 @@ and the local format engine.
   renders, not Finder/native-picker interaction tests.
 - Widget coverage includes 200% text, compact layouts, crop gestures, stale
   preview responses, no render-on-rebuild, inline invalid-name blocking, page
-  selection/actions/reset and compatible result continuation.
+  selection/actions/reset, keeping the visual rotation plan when switching batch
+  previews, and compatible result continuation.
 
 For isolated visual reproduction:
 

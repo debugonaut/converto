@@ -840,6 +840,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
           service: _previews,
           expression: _controller('pages', ''),
           organize: _id == ToolId.organize,
+          rotations: (_values['pageRotations'] as List<int>?) ?? const [],
           selectable: _id == ToolId.extract,
           enabled: !_filesLocked,
           onRotations: (rotations) =>
