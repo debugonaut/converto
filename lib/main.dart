@@ -4,6 +4,8 @@ import 'ui/screens/home_dashboard.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 24 * 1024 * 1024;
+  PaintingBinding.instance.imageCache.maximumSize = 64;
   runApp(const ConvertoApp());
 }
 

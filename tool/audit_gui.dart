@@ -81,6 +81,7 @@ Future<void> main() async {
       tool: id,
       paths: paths ?? [source.path],
       options: options,
+      outputName: id == ToolId.info ? null : 'Reviewed ${id.name}',
       outputDirectory: output ?? p.join(root.path, id.name),
     ),
     isCancelled: cancelled,
@@ -133,6 +134,12 @@ Future<void> main() async {
         id.name,
         () => run(id, paths: paths, options: options),
         verify: (result) async {
+          check(
+            result.outputs.every(
+              (output) => p.basename(output).startsWith('Reviewed ${id.name}'),
+            ),
+            'Chosen output name was not applied',
+          );
           switch (id) {
             case ToolId.merge:
               check(
@@ -145,6 +152,12 @@ Future<void> main() async {
               check(
                 await PdfEngine.pageCount(File(result.outputs.single)) == 4,
                 'Organize page count',
+              );
+              check(
+                (await PdfEngine.extractText(
+                  File(result.outputs.single),
+                )).contains('Page 3'),
+                'Organize output must remain fully readable',
               );
             case ToolId.extract:
               check(

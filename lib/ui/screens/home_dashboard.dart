@@ -12,6 +12,7 @@ import '../../models/gui/tool_definition.dart';
 import '../../services/gui/file_intake.dart';
 import '../../services/gui/gui_job_controller.dart';
 import '../../services/gui/gui_preferences.dart';
+import '../../services/gui/local_preview_service.dart';
 import '../../services/history_service.dart';
 import '../../services/local_process.dart';
 import '../../services/storage_service.dart';
@@ -27,6 +28,7 @@ class HomeDashboard extends StatefulWidget {
 class _HomeDashboardState extends State<HomeDashboard> {
   final _preferences = GuiPreferences();
   final _job = GuiJobController();
+  final _previews = LocalPreviewService();
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   List<String> _paths = [];
@@ -35,6 +37,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   bool _recent = false;
   bool _dragging = false;
   int _pendingIntakes = 0;
+  int _intakeRevision = 0;
   String _query = '';
   Future<void> _intakeTail = Future.value();
 
@@ -56,6 +59,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   void _refresh() {
+    _previews.paused = _job.busy;
     if (mounted) setState(() {});
   }
 
@@ -63,6 +67,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   void dispose() {
     _job.removeListener(_refresh);
     _job.dispose();
+    _previews.dispose();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -84,6 +89,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           if (!mounted || _job.busy) return;
           setState(() {
             _paths = result.paths.toList();
+            _intakeRevision++;
             _recent = false;
           });
           if (result.issues.isNotEmpty)
@@ -370,6 +376,16 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                   outputDirectory: _preferences.outputDirectory,
                                   remember: _preferences.rememberHistory,
                                   addingFiles: _pendingIntakes > 0,
+                                  previews: _previews,
+                                  intakeRevision: _intakeRevision,
+                                  onUseResults: (tool, paths) {
+                                    _job.reset();
+                                    setState(() {
+                                      _paths = List.of(paths);
+                                      _tool = tool;
+                                      _recent = false;
+                                    });
+                                  },
                                   onBack: () => setState(() => _tool = null),
                                   onPick: _pick,
                                   onChooseOutput: _chooseOutput,

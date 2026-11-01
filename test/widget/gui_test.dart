@@ -131,7 +131,17 @@ void main() {
           tester
               .widget<FilledButton>(find.byKey(const Key('run-tool')))
               .onPressed,
-          isNotNull,
+          [
+                ToolId.organize,
+                ToolId.watermark,
+                ToolId.protect,
+                ToolId.redact,
+                ToolId.extract,
+                ToolId.crop,
+                ToolId.unlock,
+              ].contains(tool.id)
+              ? isNull
+              : isNotNull,
           reason: tool.title,
         );
       }

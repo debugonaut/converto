@@ -8,11 +8,17 @@ import '../pdf/pdf_engine.dart';
 import 'gui_executor.dart';
 
 class GuiJobController extends ChangeNotifier {
+  final Future<void> Function(Iterable<HistoryItem>) _recordHistory;
+  GuiJobController({
+    Future<void> Function(Iterable<HistoryItem>)? recordHistory,
+  }) : _recordHistory = recordHistory ?? HistoryService().addRecords;
+  String? historyWarning;
   bool busy = false;
   bool cancelling = false;
   double progress = 0;
   String message = '';
   String? error;
+  String? failedSource;
   GuiResult? result;
   SendPort? _cancelPort;
   bool _disposed = false;
@@ -24,7 +30,9 @@ class GuiJobController extends ChangeNotifier {
   void reset() {
     if (busy) return;
     result = null;
+    historyWarning = null;
     error = null;
+    failedSource = null;
     message = '';
     progress = 0;
     _changed();
@@ -33,8 +41,10 @@ class GuiJobController extends ChangeNotifier {
   Future<void> run(GuiRequest request, {bool remember = true}) async {
     if (busy) return;
     busy = true;
+    historyWarning = null;
     cancelling = false;
     error = null;
+    failedSource = null;
     result = null;
     progress = 0;
     message = 'Starting…';
@@ -56,6 +66,7 @@ class GuiJobController extends ChangeNotifier {
               List<String>.from(event['outputs'] as List),
               List<String>.from(event['details'] as List),
               Map<String, String>.from(event['sources'] as Map),
+              GuiMetrics.fromMap(event['metrics'] as Map? ?? const {}),
             );
             message = 'Complete';
             if (!done.isCompleted) done.complete();
@@ -64,6 +75,7 @@ class GuiJobController extends ChangeNotifier {
             if (!done.isCompleted) done.complete();
           case 'error':
             error = event['message'] as String;
+            failedSource = event['sourcePath'] as String?;
             message = 'Could not complete this operation.';
             if (!done.isCompleted) done.complete();
         }
@@ -82,27 +94,34 @@ class GuiJobController extends ChangeNotifier {
       );
       await done.future;
       if (remember && result != null && result!.outputs.isNotEmpty) {
-        final records = <HistoryItem>[];
-        final outputs = result!.outputs;
-        final recentOutputs = outputs.length > 1000
-            ? outputs.skip(outputs.length - 1000)
-            : outputs;
-        for (final output in recentOutputs) {
-          final source = result!.sourcePaths[output] ?? request.paths.first;
-          records.add(
-            HistoryItem(
-              id: '${DateTime.now().microsecondsSinceEpoch}-$output',
-              sourceName: FileUtils.getFileName(source),
-              sourcePath: source,
-              sourceFormat: FileUtils.getExtension(source),
-              targetPath: output,
-              targetFormat: FileUtils.getExtension(output),
-              fileSizeBytes: await File(output).length(),
-              timestamp: DateTime.now(),
-            ),
-          );
+        try {
+          final records = <HistoryItem>[];
+          final outputs = result!.outputs;
+          final recentOutputs = outputs.length > 1000
+              ? outputs.skip(outputs.length - 1000)
+              : outputs;
+          for (final output in recentOutputs) {
+            final source = result!.sourcePaths[output] ?? request.paths.first;
+            records.add(
+              HistoryItem(
+                id: '${DateTime.now().microsecondsSinceEpoch}-$output',
+                sourceName: FileUtils.getFileName(source),
+                sourcePath: source,
+                sourceFormat: FileUtils.getExtension(source),
+                targetPath: output,
+                targetFormat: FileUtils.getExtension(output),
+                fileSizeBytes: await File(output).length(),
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+          await _recordHistory(records);
+        } catch (_) {
+          // Publication has succeeded. An optional history write must never
+          // report a failed operation or suggest saved files were rolled back.
+          historyWarning =
+              'Files were saved. Recent history could not be updated.';
         }
-        await HistoryService().addRecords(records);
       }
     } catch (e) {
       error = e.toString();
@@ -150,11 +169,16 @@ Future<void> _worker((SendPort, GuiRequest) input) async {
       'outputs': result.outputs,
       'details': result.details,
       'sources': result.sourcePaths,
+      'metrics': result.metrics.toMap(),
     });
   } on GuiCancelled {
     port.send({'type': 'cancelled'});
   } catch (e) {
-    port.send({'type': 'error', 'message': PdfEngine.errorMessage(e)});
+    port.send({
+      'type': 'error',
+      'message': PdfEngine.errorMessage(e),
+      'sourcePath': e is GuiInputFailure ? e.sourcePath : null,
+    });
   } finally {
     await PdfEngine.dispose();
     cancellation.close();
