@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/file_intake.dart';
+import '../../services/gui/desktop_file_picker.dart';
 import '../../services/gui/gui_job_controller.dart';
 import '../../services/gui/gui_preferences.dart';
 import '../../services/gui/local_preview_service.dart';
@@ -107,13 +107,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Future<void> _pick() async {
     if (_job.busy) return;
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: FormatRegistry.allSupportedExtensions,
-        dialogTitle: 'Choose files to work with',
+      final paths = await DesktopFilePicker.pickFiles(
+        extensions: FormatRegistry.allSupportedExtensions,
       );
-      if (result != null) await _intake(result.paths.whereType<String>());
+      if (paths != null) await _intake(paths);
     } catch (e) {
       _notice('Could not choose files: $e');
     }
@@ -121,9 +118,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Future<void> _chooseOutput() async {
     try {
-      final folder = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Save results to',
-      );
+      final folder = await DesktopFilePicker.pickDirectory();
       if (folder == null || !mounted) return;
       setState(() => _preferences.outputDirectory = folder);
       await _preferences.save();

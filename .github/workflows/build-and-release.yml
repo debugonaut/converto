@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:
@@ -43,8 +43,39 @@ jobs:
         shell: bash
         run: python tool/test_terminal.py --binary "$(cat build/cli-path.txt)" --output build/audit/terminal
       - name: Audit GUI execution and transactional outputs on desktop
-        if: runner.os == 'macOS' || runner.os == 'Windows'
         run: dart run tool/audit_gui.dart
+      - name: Install Linux desktop build/runtime dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libblkid-dev liblzma-dev libgl1-mesa-dri xvfb dbus-x11 dpkg-dev
+      - name: Build native Linux app
+        if: runner.os == 'Linux'
+        run: flutter build linux --release --no-pub
+      - name: Package and verify portable and Debian Linux apps
+        if: runner.os == 'Linux'
+        run: python tool/package_linux.py
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: linux-app-x64
+          compression-level: 0
+          path: |
+            Converto-Linux-x64.tar.gz
+            Converto-Linux-amd64.deb
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux' && always()
+        with:
+          name: linux-app-audit
+          path: |
+            build/audit/linux-app/
+            build/audit/gui/results.json
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux' && failure()
+        with:
+          name: linux-app-diagnostics
+          compression-level: 0
+          path: |
+            Converto-Linux-x64.tar.gz
+            Converto-Linux-amd64.deb
       - name: Build native Windows app
         if: runner.os == 'Windows'
         run: flutter build windows --release --no-pub

@@ -14,8 +14,14 @@ class AppTheme {
     brightness: Brightness.dark,
     platform: Platform.isWindows
         ? TargetPlatform.windows
+        : Platform.isLinux
+        ? TargetPlatform.linux
         : TargetPlatform.macOS,
-    fontFamily: Platform.isWindows ? 'Segoe UI' : '.AppleSystemUIFont',
+    fontFamily: Platform.isWindows
+        ? 'Segoe UI'
+        : Platform.isLinux
+        ? 'sans-serif'
+        : '.AppleSystemUIFont',
     scaffoldBackgroundColor: background,
     colorScheme: const ColorScheme.dark(
       primary: amber,

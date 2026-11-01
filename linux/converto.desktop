@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Converto
+Comment=Private, offline file tools
+Exec=converto
+Icon=com.debugonaut.converto
+Terminal=false
+Categories=Utility;Graphics;Office;
+StartupWMClass=com.debugonaut.converto
