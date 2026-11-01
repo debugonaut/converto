@@ -26,6 +26,19 @@ def pe_machine(path):
         return struct.unpack_from('<H', signature, 4)[0]
 
 
+def aot_machine(path):
+    # Flutter uses app-aot-elf snapshots on Windows too; the engine's own
+    # loader reads this file. It is not a Windows DLL despite containing code.
+    with Path(path).open('rb') as stream:
+        header = stream.read(64)
+    if header[:2] == b'MZ':
+        return pe_machine(path)
+    if len(header) < 64 or header[:6] != b'\x7fELF\x02\x01':
+        raise ValueError(f'Invalid 64-bit little-endian AOT snapshot: {path}')
+    machine = struct.unpack_from('<H', header, 18)[0]
+    return X64 if machine == 62 else machine
+
+
 def files(root):
     return sorted(p for p in Path(root).rglob('*') if p.is_file())
 
@@ -46,7 +59,8 @@ def validate(root):
     binaries = []
     for path in files(root):
         if path.suffix.lower() in ('.exe', '.dll') or path.name == 'app.so':
-            if pe_machine(path) != X64:
+            machine = aot_machine(path) if path.name == 'app.so' else pe_machine(path)
+            if machine != X64:
                 raise ValueError(f'Incorrect Windows architecture: {path.name}')
             binaries.append(path.relative_to(root).as_posix())
     return binaries

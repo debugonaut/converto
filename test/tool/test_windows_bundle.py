@@ -16,6 +16,13 @@ def pe(machine=X64):
     return data
 
 
+def elf(machine=62):
+    data = bytearray(64)
+    data[:6] = b'\x7fELF\x02\x01'
+    struct.pack_into('<H', data, 18, machine)
+    return data
+
+
 class WindowsBundleTests(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory()
@@ -25,7 +32,7 @@ class WindowsBundleTests(unittest.TestCase):
             path = self.bundle / name
             path.parent.mkdir(parents=True, exist_ok=True)
             executable = path.suffix in ('.exe', '.dll') or path.name == 'app.so'
-            path.write_bytes(pe() if executable else b'offline asset content')
+            path.write_bytes(elf() if path.name == 'app.so' else pe() if executable else b'offline asset content')
         (self.bundle / 'data/font-data.bin').write_bytes(b'local font resources')
 
     def tearDown(self):
@@ -52,6 +59,16 @@ class WindowsBundleTests(unittest.TestCase):
         self.assertIn('Converto.exe', actual)
         self.assertIn('data/app.so', actual)
         self.assertIn('pdf_oxide.dll', actual)
+
+    def test_wrong_aot_snapshot_architecture_is_rejected(self):
+        (self.bundle / 'data/app.so').write_bytes(elf(183))
+        with self.assertRaisesRegex(ValueError, 'Incorrect Windows architecture'):
+            validate(self.bundle)
+
+    def test_truncated_aot_snapshot_is_rejected(self):
+        (self.bundle / 'data/app.so').write_bytes(b'\x7fELF\x02\x01')
+        with self.assertRaisesRegex(ValueError, 'Invalid 64-bit'):
+            validate(self.bundle)
 
     def test_missing_native_engine_is_rejected(self):
         (self.bundle / 'pdf_oxide.dll').unlink()
