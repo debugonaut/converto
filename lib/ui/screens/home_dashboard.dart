@@ -261,6 +261,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final extensions = _paths.map(FileUtils.getExtension).toSet();
     final tools = ToolDefinition.tools
         .where(
           (tool) =>
@@ -268,9 +269,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
               '${tool.title} ${tool.description}'.toLowerCase().contains(
                 _query,
               ) &&
-              _paths.every(
-                (path) => tool.accepts(FileUtils.getExtension(path)),
-              ),
+              extensions.every(tool.accepts),
         )
         .toList();
     return CallbackShortcuts(
@@ -460,7 +459,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
       return SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           compact ? 28 : 52,
-          38,
+          30,
           compact ? 28 : 52,
           36,
         ),
@@ -495,7 +494,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ],
                 ),
                 if (compact) ...[const SizedBox(height: 22), _searchField()],
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -537,7 +536,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 21),
                 Wrap(
                   spacing: 10,
                   runSpacing: 8,
@@ -551,6 +550,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           ),
                           selected: _category == category,
                           labelStyle: TextStyle(
+                            fontFamily: '.AppleSystemUIFont',
                             color: _category == category
                                 ? AppTheme.amber
                                 : AppTheme.muted,
@@ -605,7 +605,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           .map(
                             (tool) => SizedBox(
                               width: width,
-                              height: 156,
+                              height: 136,
                               child: Material(
                                 color: AppTheme.surface,
                                 shape: RoundedRectangleBorder(
@@ -621,7 +621,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                     setState(() => _tool = tool);
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.all(22),
+                                    padding: const EdgeInsets.all(18),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,

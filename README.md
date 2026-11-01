@@ -35,7 +35,7 @@ Cancellation waits for the current local engine call to finish. Optional local
 history can be disabled or cleared in Settings. The app performs no runtime
 network requests, signup, uploads, telemetry or codec downloads.
 
-Download `macos-app-preview` from a successful workflow run, extract the inner
+Download `macos-app-preview` from a successful [native workflow run](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml), extract the inner
 `Converto-macOS-preview.zip`, and open `Converto.app`. This is an **ad-hoc signed,
 not notarized developer preview**, targeting macOS 13+; validate the artifact on
 your Mac before distribution. Apple distribution signing/notarization is a
@@ -54,7 +54,7 @@ The macOS runner, UI and shared executor are in `macos/`, `lib/ui/` and
 `lib/services/gui/`. Run `dart run tool/audit_gui.dart` for machine-readable
 per-tool results under `build/audit/gui/results.json`; widget and worker tests
 run with the ordinary Flutter test suite. The existing CLI audit below remains
-separate from GUI and native-window validation.
+separate from GUI and native-window validation. See the [Mac app audit](docs/audit/2026-11-01-macos-app.md) for per-tool results and the explicit native-interaction checks still pending.
 
 ## Installation
 
@@ -225,6 +225,12 @@ All conversion paths below execute on the local machine. The optional helper bra
 
 ```mermaid
 flowchart TD
+    App["Native Mac tool hub<br/>Picker and Finder file drops"] --> Intake["FileIntake<br/>Selection only, deduplicated paths"]
+    Intake --> Workspace["Focused tool workspace<br/>Explicit Run"]
+    Workspace --> Worker["GUI background isolate<br/>Private batch staging"]
+    Worker --> Operations
+    Worker --> PDF
+    Worker --> History
     Argv["OS-tokenized argv"] --> Entry["CLI entry"]
     Terminal["Terminal input and file drops"] --> Input["Single async stdin owner<br/>Path and paste parser"]
     Entry --> Shell["Interactive slash shell"]
@@ -247,6 +253,8 @@ flowchart TD
 
 | Boundary | Responsibility |
 |---|---|
+| [`lib/ui/`](lib/ui/) / [`macos/`](macos/) | Native Mac tool hub, focused workspaces, picker/drop integration, history and settings |
+| [`lib/services/gui/`](lib/services/gui/) | Safe file intake, background worker lifecycle, transactional batch execution and local preferences |
 | [`bin/converto.dart`](bin/converto.dart) | CLI entry, argv commands, exit status, lifecycle cleanup |
 | [`lib/core/terminal/`](lib/core/terminal/) | Shared asynchronous input, bracketed paste, path parsing, slash commands, terminal restoration |
 | [`FileOperations`](lib/services/file_operations.dart) | Shared conversion dispatch and ordered PDF/image merging across argv, slash commands, and file drops |
@@ -255,7 +263,7 @@ flowchart TD
 | [`OfficeBridge`](lib/services/office_bridge.dart) / [`LocalProcess`](lib/services/local_process.dart) | Optional helper discovery, isolated Office profiles, temporary work, timeouts, and process errors |
 | [`StorageService`](lib/services/storage_service.dart) / [`HistoryService`](lib/services/history_service.dart) | Local outputs, staged replacement, collision handling, and bounded optional history |
 
-The existing Flutter GUI scaffold and static landing page remain in the repository. They are separate from the native CLI bundle and its verification path.
+The Mac app and CLI share the processing engines. The app stages whole GUI batches and publishes them only after success. The static landing page remains a separate surface.
 
 ## Tech stack
 
@@ -263,6 +271,7 @@ Versions below are from the committed dependency lockfile.
 
 | Layer | Technology | Role |
 |---|---|---|
+| Mac desktop app | Flutter, native macOS runner, `desktop_drop`, `file_picker` | Searchable tool catalog, focused workspaces and background isolates |
 | Native CLI | Dart AOT, `args` 2.7.0, `path` 1.9.1 | Commands, filesystem handling, async terminal I/O, native executable |
 | PDF generation | `pdf` 3.12.0 | Image/text/table PDF creation |
 | Native PDF processing | `pdf_manipulator` **5.0.1**, pdf_oxide backend | PDF rendering, editing, merging, extraction, and security |
@@ -399,7 +408,7 @@ See each tool's `--help` for arguments. [`build-and-release.yml`](.github/workfl
 
 ## Contributing and license
 
-Keep the CLI offline and local, preserve the established terminal/ASCII presentation, and attach reproducible fixtures and native verification to behavior fixes. Run the relevant checks above before submitting a change. GUI work follows CLI reliability.
+Keep the CLI offline and local, preserve the established terminal/ASCII presentation, and attach reproducible fixtures and native verification to behavior fixes. Run the relevant checks above before submitting a change. Keep GUI work on the shared engines and preserve explicit-run/drop safety.
 
 [Report a reproducible issue](https://github.com/debugonaut/converto/issues), including OS/architecture, command, expected/actual behavior, and a synthetic or appropriately sanitized fixture. Use repository access controls when sharing private material.
 

@@ -1,0 +1,271 @@
+[
+  {
+    "case": "convert",
+    "status": "pass",
+    "ms": 38.042,
+    "outputs": [
+      "convert/image_convert.pdf"
+    ],
+    "bytes": 1151
+  },
+  {
+    "case": "merge",
+    "status": "pass",
+    "ms": 389.376,
+    "outputs": [
+      "merge/merged.pdf"
+    ],
+    "bytes": 3776
+  },
+  {
+    "case": "split",
+    "status": "pass",
+    "ms": 9.772,
+    "outputs": [
+      "split/sample \u65e5\u672c\u8a9e spaces_part1.pdf",
+      "split/sample \u65e5\u672c\u8a9e spaces_part2.pdf",
+      "split/sample \u65e5\u672c\u8a9e spaces_part3.pdf"
+    ],
+    "bytes": 6444
+  },
+  {
+    "case": "compress",
+    "status": "pass",
+    "ms": 7.44,
+    "outputs": [
+      "compress/sample \u65e5\u672c\u8a9e spaces_compress.pdf"
+    ],
+    "bytes": 2897
+  },
+  {
+    "case": "organize",
+    "status": "pass",
+    "ms": 7.231,
+    "outputs": [
+      "organize/sample \u65e5\u672c\u8a9e spaces_organize.pdf"
+    ],
+    "bytes": 3265
+  },
+  {
+    "case": "editImage",
+    "status": "pass",
+    "ms": 8.279,
+    "outputs": [
+      "editImage/image_editImage.png"
+    ],
+    "bytes": 85
+  },
+  {
+    "case": "watermark",
+    "status": "pass",
+    "ms": 5.652,
+    "outputs": [
+      "watermark/sample \u65e5\u672c\u8a9e spaces_watermark.pdf"
+    ],
+    "bytes": 4779
+  },
+  {
+    "case": "protect",
+    "status": "pass",
+    "ms": 6.062,
+    "outputs": [
+      "protect/sample \u65e5\u672c\u8a9e spaces_protect.pdf"
+    ],
+    "bytes": 3641
+  },
+  {
+    "case": "redact",
+    "status": "pass",
+    "ms": 11.438,
+    "outputs": [
+      "redact/sample \u65e5\u672c\u8a9e spaces_redact.pdf"
+    ],
+    "bytes": 3658
+  },
+  {
+    "case": "pdfImages",
+    "status": "pass",
+    "ms": 126.645,
+    "outputs": [
+      "pdfImages/sample \u65e5\u672c\u8a9e spaces_page_1.jpg",
+      "pdfImages/sample \u65e5\u672c\u8a9e spaces_page_2.jpg",
+      "pdfImages/sample \u65e5\u672c\u8a9e spaces_page_3.jpg"
+    ],
+    "bytes": 16091
+  },
+  {
+    "case": "pdfText",
+    "status": "pass",
+    "ms": 3.744,
+    "outputs": [
+      "pdfText/sample \u65e5\u672c\u8a9e spaces_pdfText.txt"
+    ],
+    "bytes": 62
+  },
+  {
+    "case": "pdfOffice",
+    "status": "pass",
+    "ms": 4.193,
+    "outputs": [
+      "pdfOffice/sample \u65e5\u672c\u8a9e spaces_pdfOffice.docx"
+    ],
+    "bytes": 2643
+  },
+  {
+    "case": "extract",
+    "status": "pass",
+    "ms": 4.597,
+    "outputs": [
+      "extract/sample \u65e5\u672c\u8a9e spaces_extract.pdf"
+    ],
+    "bytes": 2535
+  },
+  {
+    "case": "rotate",
+    "status": "pass",
+    "ms": 3.896,
+    "outputs": [
+      "rotate/sample \u65e5\u672c\u8a9e spaces_rotate.pdf"
+    ],
+    "bytes": 2930
+  },
+  {
+    "case": "pageNumbers",
+    "status": "pass",
+    "ms": 5.429,
+    "outputs": [
+      "pageNumbers/sample \u65e5\u672c\u8a9e spaces_pageNumbers.pdf"
+    ],
+    "bytes": 4428
+  },
+  {
+    "case": "crop",
+    "status": "pass",
+    "ms": 5.492,
+    "outputs": [
+      "crop/sample \u65e5\u672c\u8a9e spaces_crop.pdf"
+    ],
+    "bytes": 3005
+  },
+  {
+    "case": "pdfa",
+    "status": "pass",
+    "ms": 25.37,
+    "outputs": [
+      "pdfa/sample \u65e5\u672c\u8a9e spaces_pdfa.pdf"
+    ],
+    "bytes": 220653
+  },
+  {
+    "case": "unlock",
+    "status": "pass",
+    "ms": 9.315,
+    "outputs": [
+      "unlock/sample \u65e5\u672c\u8a9e spaces_protect_unlock.pdf"
+    ],
+    "bytes": 2900
+  },
+  {
+    "case": "info",
+    "status": "pass",
+    "ms": 1.603,
+    "outputs": [],
+    "bytes": 0
+  },
+  {
+    "case": "PDF conversion exports ALL pages",
+    "status": "pass",
+    "ms": 12.846,
+    "outputs": [
+      "convert/sample \u65e5\u672c\u8a9e spaces_page_1.png",
+      "convert/sample \u65e5\u672c\u8a9e spaces_page_2.png",
+      "convert/sample \u65e5\u672c\u8a9e spaces_page_3.png"
+    ],
+    "bytes": 176899
+  },
+  {
+    "case": "split explicit ranges",
+    "status": "pass",
+    "ms": 4.844,
+    "outputs": [
+      "split/sample \u65e5\u672c\u8a9e spaces_part1_1.pdf",
+      "split/sample \u65e5\u672c\u8a9e spaces_part2_1.pdf"
+    ],
+    "bytes": 4683
+  },
+  {
+    "case": "PDF to XLSX",
+    "status": "pass",
+    "ms": 2.733,
+    "outputs": [
+      "pdfOffice/sample \u65e5\u672c\u8a9e spaces_pdfOffice.xlsx"
+    ],
+    "bytes": 3776
+  },
+  {
+    "case": "PDF to PPTX",
+    "status": "pass",
+    "ms": 2.928,
+    "outputs": [
+      "pdfOffice/sample \u65e5\u672c\u8a9e spaces_pdfOffice.pptx"
+    ],
+    "bytes": 7445
+  },
+  {
+    "case": "collision retains existing output",
+    "status": "pass",
+    "ms": 10.012,
+    "outputs": [
+      "merge/merged_1.pdf"
+    ],
+    "bytes": 3776
+  },
+  {
+    "case": "cancel before start",
+    "status": "pass",
+    "ms": 1.009,
+    "error": "Instance of 'GuiCancelled'"
+  },
+  {
+    "case": "cancel after engine progress",
+    "status": "pass",
+    "ms": 4.671,
+    "error": "Instance of 'GuiCancelled'"
+  },
+  {
+    "case": "batch rollback after first success",
+    "status": "pass",
+    "ms": 3.735,
+    "error": "PdfEngineError: Invalid cross-reference table"
+  },
+  {
+    "case": "bad page range",
+    "status": "pass",
+    "ms": 1.53,
+    "error": "FormatException: Page \"999\" is outside 1-3."
+  },
+  {
+    "case": "wrong password",
+    "status": "pass",
+    "ms": 2.587,
+    "error": "PdfEngineError: wrong password"
+  },
+  {
+    "case": "empty password",
+    "status": "pass",
+    "ms": 0.411,
+    "error": "Invalid argument(s): Enter a password."
+  },
+  {
+    "case": "invalid image crop",
+    "status": "pass",
+    "ms": 0.332,
+    "error": "Invalid argument(s): Fill all four image crop values, or leave them blank."
+  },
+  {
+    "case": "invalid dimensions",
+    "status": "pass",
+    "ms": 0.375,
+    "error": "Invalid argument(s): Enter a valid width (at least 1)."
+  }
+]

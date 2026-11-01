@@ -92,9 +92,14 @@ class HistoryService {
   }
 
   Future<void> addRecord(HistoryItem item) async {
+    await addRecords([item]);
+  }
+
+  /// One write per completed batch, even for thousands of exported pages.
+  Future<void> addRecords(Iterable<HistoryItem> items) async {
     if (Platform.environment['CONVERTO_HISTORY'] == 'off') return;
     await init();
-    _history.add(item);
+    _history.addAll(items);
     if (_history.length > 1000) _history.removeRange(0, _history.length - 1000);
     await _save();
   }

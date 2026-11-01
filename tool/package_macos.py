@@ -16,7 +16,7 @@ subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=T
 archive = root / 'Converto-macOS-preview.zip'
 subprocess.run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(app), str(archive)], check=True)
 metadata = {
-    'bundleBytes': sum(file.stat().st_size for file in app.rglob('*') if file.is_file()),
+    'bundleBytes': sum(file.stat().st_size for file in app.rglob('*') if file.is_file() and not file.is_symlink()),
     'archiveBytes': archive.stat().st_size,
     'signing': 'ad-hoc developer preview; not notarized',
 }

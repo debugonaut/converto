@@ -49,7 +49,7 @@ class ToolDefinition {
     if (id == ToolId.pdfText) return ['txt'];
     if (id != ToolId.convert && id != ToolId.editImage) return ['pdf'];
     Set<String>? shared;
-    for (final ext in extensions) {
+    for (final ext in extensions.toSet()) {
       final values = FormatRegistry.getAvailableTargetFormats(ext).toSet();
       shared = shared == null ? values : shared.intersection(values);
     }

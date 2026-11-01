@@ -6,9 +6,13 @@ import 'package:path/path.dart' as p;
 /// Local optional codecs. Never installs or downloads a helper at runtime.
 class LocalProcess {
   static String? find(String executable) {
-    final paths = (Platform.environment['PATH'] ?? '').split(
-      Platform.isWindows ? ';' : ':',
-    );
+    final paths = [
+      ...(Platform.environment['PATH'] ?? '').split(
+        Platform.isWindows ? ';' : ':',
+      ),
+      // Finder launches do not inherit the user's interactive shell PATH.
+      if (Platform.isMacOS) ...['/opt/homebrew/bin', '/usr/local/bin'],
+    ];
     final extensions = Platform.isWindows
         ? [
             '',

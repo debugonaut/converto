@@ -62,7 +62,11 @@ class AppTheme {
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontSize: 14,
+          fontFamily: '.AppleSystemUIFont',
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -79,7 +83,10 @@ class AppTheme {
       side: const BorderSide(color: border),
       showCheckmark: false,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-      labelStyle: const TextStyle(fontSize: 13),
+      labelStyle: const TextStyle(
+        fontSize: 13,
+        fontFamily: '.AppleSystemUIFont',
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
     ),
     tooltipTheme: const TooltipThemeData(

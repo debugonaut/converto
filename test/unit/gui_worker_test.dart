@@ -63,4 +63,33 @@ void main() {
       }
     },
   );
+  test('batch source tracking survives output name collisions', () async {
+    final scratch = Directory.systemTemp.createTempSync('gui-batch-');
+    final job = GuiJobController();
+    try {
+      final paths = <String>[];
+      for (final folder in ['a', 'b']) {
+        Directory('${scratch.path}/$folder').createSync();
+        final file = File('${scratch.path}/$folder/same.png')
+          ..writeAsBytesSync(img.encodePng(img.Image(width: 16, height: 12)));
+        paths.add(file.path);
+      }
+      await job.run(
+        GuiRequest(
+          tool: ToolId.convert,
+          paths: paths,
+          outputDirectory: '${scratch.path}/out',
+          options: {'format': 'jpg'},
+        ),
+        remember: false,
+      );
+      expect(job.error, isNull);
+      expect(job.result!.outputs.toSet().length, 2);
+      expect(job.result!.sourcePaths.values.toSet(), paths.toSet());
+      expect(Directory('${scratch.path}/out').listSync().length, 2);
+    } finally {
+      job.dispose();
+      scratch.deleteSync(recursive: true);
+    }
+  });
 }

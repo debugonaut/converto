@@ -55,6 +55,7 @@ class GuiJobController extends ChangeNotifier {
             result = GuiResult(
               List<String>.from(event['outputs'] as List),
               List<String>.from(event['details'] as List),
+              Map<String, String>.from(event['sources'] as Map),
             );
             message = 'Complete';
             if (!done.isCompleted) done.complete();
@@ -80,10 +81,15 @@ class GuiJobController extends ChangeNotifier {
         errorsAreFatal: true,
       );
       await done.future;
-      if (remember && result != null && request.paths.isNotEmpty) {
-        final source = request.paths.first;
-        for (final output in result!.outputs) {
-          await HistoryService().addRecord(
+      if (remember && result != null && result!.outputs.isNotEmpty) {
+        final records = <HistoryItem>[];
+        final outputs = result!.outputs;
+        final recentOutputs = outputs.length > 1000
+            ? outputs.skip(outputs.length - 1000)
+            : outputs;
+        for (final output in recentOutputs) {
+          final source = result!.sourcePaths[output] ?? request.paths.first;
+          records.add(
             HistoryItem(
               id: '${DateTime.now().microsecondsSinceEpoch}-$output',
               sourceName: FileUtils.getFileName(source),
@@ -96,6 +102,7 @@ class GuiJobController extends ChangeNotifier {
             ),
           );
         }
+        await HistoryService().addRecords(records);
       }
     } catch (e) {
       error = e.toString();
@@ -142,6 +149,7 @@ Future<void> _worker((SendPort, GuiRequest) input) async {
       'type': 'done',
       'outputs': result.outputs,
       'details': result.details,
+      'sources': result.sourcePaths,
     });
   } on GuiCancelled {
     port.send({'type': 'cancelled'});

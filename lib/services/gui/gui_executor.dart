@@ -23,7 +23,8 @@ class GuiRequest {
 class GuiResult {
   final List<String> outputs;
   final List<String> details;
-  const GuiResult(this.outputs, this.details);
+  final Map<String, String> sourcePaths;
+  const GuiResult(this.outputs, this.details, [this.sourcePaths = const {}]);
 }
 
 class GuiCancelled implements Exception {
@@ -60,7 +61,9 @@ class GuiExecutor {
     await output.create(recursive: true);
     final staging = await output.createTemp('.converto-gui-');
     final generated = <File>[];
+    final generatedSources = <String, String>{};
     final published = <File>[];
+    final publishedSources = <String, String>{};
     final details = <String>[];
     final o = request.options;
     String text(String name, [String fallback = '']) =>
@@ -119,6 +122,7 @@ class GuiExecutor {
             '${index + 1} of ${request.paths.length} · ${p.basename(source.path)}',
           );
           progress(0);
+          final firstNewOutput = generated.length;
           switch (request.tool) {
             case ToolId.convert:
             case ToolId.editImage:
@@ -339,6 +343,9 @@ class GuiExecutor {
             case ToolId.merge:
               throw StateError('Merge is executed as one ordered batch.');
           }
+          for (final file in generated.skip(firstNewOutput)) {
+            generatedSources[file.path] = source.path;
+          }
           await checkpoint();
         }
       }
@@ -350,10 +357,16 @@ class GuiExecutor {
           output.path,
           p.basename(file.path),
         );
+        publishedSources[destination] =
+            generatedSources[file.path] ?? request.paths.first;
         published.add(file.renameSync(destination));
       }
       onProgress?.call(1, 'Complete');
-      return GuiResult(published.map((file) => file.path).toList(), details);
+      return GuiResult(
+        published.map((file) => file.path).toList(),
+        details,
+        publishedSources,
+      );
     } catch (_) {
       for (final file in published) {
         if (file.existsSync()) file.deleteSync();

@@ -341,18 +341,32 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                     padding: const EdgeInsets.only(top: 16),
                     child: SelectableText(detail),
                   ),
-                for (final output in widget.job.result!.outputs)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(p.basename(output)),
-                    subtitle: Text(
-                      FileUtils.formatBytes(File(output).lengthSync()),
-                    ),
-                    onTap: () => widget.onOpen(output),
-                    trailing: IconButton(
-                      tooltip: 'Show in Finder',
-                      onPressed: () => widget.onOpen(output, reveal: true),
-                      icon: const Icon(Icons.folder_open_outlined),
+                if (widget.job.result!.outputs.isNotEmpty)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemExtent: 72,
+                      itemCount: widget.job.result!.outputs.length,
+                      itemBuilder: (context, index) {
+                        final output = widget.job.result!.outputs[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            p.basename(output),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(_outputSize(output)),
+                          onTap: () => widget.onOpen(output),
+                          trailing: IconButton(
+                            tooltip: 'Show in Finder',
+                            onPressed: () =>
+                                widget.onOpen(output, reveal: true),
+                            icon: const Icon(Icons.folder_open_outlined),
+                          ),
+                        );
+                      },
                     ),
                   ),
               ],
@@ -361,6 +375,17 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         ),
       ),
     );
+  }
+
+  String _outputSize(String path) {
+    try {
+      final stat = File(path).statSync();
+      return stat.type == FileSystemEntityType.file
+          ? FileUtils.formatBytes(stat.size)
+          : 'File moved or deleted';
+    } on FileSystemException {
+      return 'File unavailable';
+    }
   }
 
   Widget _files(int incompatible) => Column(
