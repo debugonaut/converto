@@ -12,14 +12,23 @@ struct _MyApplication {
   char** dart_entrypoint_arguments;
   gboolean startup_probe;
   gboolean picker_open;
+  gboolean first_frame;
+  gboolean probe_finished;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static gboolean close_probe(gpointer data);
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   if (self->startup_probe) {
     g_printerr("CONVERTO_LINUX_FIRST_FRAME_OK\n");
+    self->first_frame = TRUE;
+    if (self->probe_finished) {
+      g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, close_probe,
+          g_object_ref(gtk_widget_get_toplevel(GTK_WIDGET(view))), g_object_unref);
+    }
   } else {
     gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
   }
@@ -48,8 +57,11 @@ static void files_method_call(FlMethodChannel* channel, FlMethodCall* call,
   const gchar* method = fl_method_call_get_name(call);
   if (g_strcmp0(method, "finishProbe") == 0 && self->startup_probe) {
     fl_method_call_respond_success(call, nullptr, nullptr);
-    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, close_probe,
-                    g_object_ref(window), g_object_unref);
+    self->probe_finished = TRUE;
+    if (self->first_frame) {
+      g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, close_probe,
+                      g_object_ref(window), g_object_unref);
+    }
     return;
   }
   const bool directory = g_strcmp0(method, "pickDirectory") == 0;

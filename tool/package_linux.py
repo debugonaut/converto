@@ -73,11 +73,13 @@ def main():
             'Manual GNOME/KDE, X11/Wayland and file-manager drag/drop QA is pending.\n', encoding='utf-8')
         binaries = validate(app)
         dependencies = {}
+        library_dirs = sorted({str((app / name).parent) for name in binaries})
+        inspect_env = dict(os.environ, LD_LIBRARY_PATH=os.pathsep.join(library_dirs))
         glibc = set()
         for relative in binaries:
             path = app / relative
             # libapp.so is a Flutter AOT container with no ordinary dynamic dependencies.
-            listing = run(['ldd', str(path)])
+            listing = run(['ldd', str(path)], env=inspect_env)
             if 'not found' in listing:
                 raise RuntimeError(f'Missing runtime dependency in {relative}: {listing}')
             dependencies[relative] = listing.strip().splitlines()
