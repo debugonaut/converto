@@ -64,6 +64,12 @@ jobs:
           path: |
             build/audit/windows-app/package.json
             build/audit/gui/results.json
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && failure()
+        with:
+          name: windows-app-diagnostics
+          compression-level: 0
+          path: Converto-Windows-x64.zip
       - name: Build native Mac app
         if: runner.os == 'macOS'
         run: flutter build macos --release --no-pub

@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <iostream>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -24,12 +25,17 @@ bool FlutterWindow::OnCreate() {
   if (!flutter_controller_->engine() || !flutter_controller_->view()) {
     return false;
   }
+  if (startup_probe_) std::cerr << "Converto startup probe: engine initialized\n";
   RegisterPlugins(flutter_controller_->engine());
+  if (startup_probe_) std::cerr << "Converto startup probe: plugins registered\n";
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     if (startup_probe_) {
-      PostQuitMessage(0);
+      std::cerr << "Converto startup probe: first Flutter frame\n";
+      // Close via the normal window lifecycle. Exiting the message loop here
+      // tears down COM before plugins and the Flutter controller are disposed.
+      PostMessage(GetHandle(), WM_CLOSE, 0, 0);
     } else {
       this->Show();
     }
