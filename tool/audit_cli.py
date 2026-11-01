@@ -428,7 +428,7 @@ class Audit:
                 elif command=='protect':
                     with fitz.open(dest) as doc: require(doc.needs_pass,'Slash protect is unencrypted')
                 else: validate(dest,dest.suffix[1:])
-            line='/'+' '.join(quote_terminal_arg(x) for x in tokens)+'\n/exit\n'
+            line='/'+tokens[0]+' '+' '.join(quote_terminal_arg(x) for x in tokens[1:])+'\n/exit\n'
             self.case('slash-'+tokens[0],['interactive'],check,stdin=line,group='slash')
         dest=self.output/'slash-convert.pdf'
         self.case('slash-convert',['interactive'],lambda r:validate(dest,'pdf',1),
