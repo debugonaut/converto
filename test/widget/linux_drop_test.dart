@@ -38,8 +38,10 @@ void main() {
       );
     }
 
-    await tester.runAsync(() async {
-      for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 5; i++) {
+      await event(Platform.isLinux ? 'updated' : 'entered', [300.0, 300.0]);
+      await tester.pump();
+      await tester.runAsync(() async {
         await event('updated', [300.0, 300.0]);
         // GTK emits leave before data-received on Linux.
         if (Platform.isLinux) await event('exited', null);
@@ -47,9 +49,10 @@ void main() {
           payload,
           [300.0, 300.0],
         ]);
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-    });
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     expect(
       find.text('2 files selected · showing compatible tools'),

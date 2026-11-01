@@ -35,7 +35,7 @@ def probe(app, temporary):
     Path(env['HOME']).mkdir(exist_ok=True)
     log = run(['xvfb-run', '-a', 'dbus-run-session', '--', str(app / 'converto'),
                '--converto-startup-probe'], cwd=temporary, env=env)
-    if 'CONVERTO_LINUX_FIRST_FRAME_OK' not in log or 'CONVERTO_LINUX_PICKERS_OK' not in log or 'CONVERTO_LINUX_PROBE_FAILED' in log:
+    if 'CONVERTO_LINUX_FIRST_FRAME_OK' not in log or 'CONVERTO_LINUX_PICKERS_OK' not in log or 'CONVERTO_LINUX_BUNDLED_ENGINE_OK' not in log or 'CONVERTO_LINUX_PROBE_FAILED' in log:
         raise RuntimeError(f'Native startup/picker probe did not complete: {log}')
     return log
 
@@ -150,6 +150,7 @@ def main():
             'tarContentsAndModes': 'pass', 'debianContentsAndModes': 'pass',
             'portableFirstFrameAndPickerCancellation': 'pass',
             'debianFirstFrameAndPickerCancellation': 'pass',
+            'bundledPdfWatermarkAndReadbackBothPackages': 'pass',
             'runtime': 'Relocated bundles, isolated profile, only system PATH, Xvfb software GL',
             'nativeDragDropManual': 'pending', 'waylandAndKdeManual': 'pending',
         }
