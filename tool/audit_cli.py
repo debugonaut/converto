@@ -390,6 +390,20 @@ class Audit:
             else:
                 self.case('unicode-font-safety-'+ext,['convert',source,'-t','pdf','-o',dest],
                           lambda r,d=dest:validate(d,'pdf',contains='你好'),group='edge')
+        for encoding in ['utf-16-le', 'utf-16-be']:
+            source=self.fixtures/f'unicode-{encoding}.csv'
+            bom=b'\xff\xfe' if encoding.endswith('le') else b'\xfe\xff'
+            source.write_bytes(bom+'Name,Value\n你好,12\n'.encode(encoding))
+            original=source.read_bytes()
+            dest=self.output/f'unicode-{encoding}-csv.pdf'
+            if self.profile=='standalone':
+                self.case('unicode-csv-'+encoding,['convert',source,'-t','pdf','-o',dest],
+                          lambda r,d=dest:require('requires' in (r.stdout+r.stderr).lower() and not d.exists(),'Unicode text was silently dropped'),
+                          expected=1,group='edge',status='unsupported')
+            else:
+                self.case('unicode-csv-'+encoding,['convert',source,'-t','pdf','-o',dest],
+                          lambda r,d=dest,s=source,b=original:(validate(d,'pdf',contains='你好'),require(s.read_bytes()==b,'Original CSV encoding changed')),
+                          group='edge')
         sources=sorted({Path(r['args'][1]) for r in self.results if r['group']=='format' and '-to-' in r['name']})
         for source in sources:
             target='png' if source.suffix=='.pdf' else 'pdf'

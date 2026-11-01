@@ -65,9 +65,15 @@ class OfficeBridge {
     }
     final temp = await Directory.systemTemp.createTemp('converto-office-');
     try {
-      final input = await source.copy(
-        p.join(temp.path, 'input${p.extension(source.path)}'),
-      );
+      final csv = FileUtils.getExtension(source.path) == 'csv';
+      final inputPath = p.join(temp.path, 'input${p.extension(source.path)}');
+      // Older Calc releases guess a legacy encoding for UTF-8 CSV. Normalize
+      // only the private staged input (including BOM-marked UTF-16 sources).
+      final input = csv
+          ? await File(
+              inputPath,
+            ).writeAsString(await FileUtils.readLocalText(source))
+          : await source.copy(inputPath);
       final outputDir = await Directory(p.join(temp.path, 'out')).create();
       final profile = Directory(p.join(temp.path, 'profile')).uri;
       await LocalProcess.run(caps.libreOfficePath!, [
@@ -76,6 +82,7 @@ class OfficeBridge {
         '--nologo',
         '--nodefault',
         '--nofirststartwizard',
+        if (csv) '--infilter=Text - txt - csv (StarCalc):44,34,76,1',
         '--convert-to',
         target,
         '--outdir',
