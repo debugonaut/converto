@@ -19,6 +19,98 @@ import 'package:converto/ui/widgets/pdf_page_controls.dart';
 import 'package:converto/ui/widgets/workspace_results.dart';
 
 void main() {
+  for (final size in [const Size(1180, 840), const Size(390, 844)]) {
+    testWidgets('image PDF output mode, naming and order work at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final scratch = Directory.systemTemp.createTempSync('images-pdf-ui-');
+      var paths = List.generate(2, (index) {
+        final file = File('${scratch.path}/photo-$index.jpg')
+          ..writeAsBytesSync(img.encodeJpg(img.Image(width: 20, height: 12)));
+        return file.path;
+      });
+      final originalPaths = List.of(paths);
+      final job = _RecordingJobController();
+      final previews = LocalPreviewService(
+        renderer: (path, page, dimension, password) async =>
+            FilePreview(path: path, kind: 'image', width: 20, height: 12),
+      );
+      addTearDown(job.dispose);
+      addTearDown(previews.dispose);
+      addTearDown(() => scratch.deleteSync(recursive: true));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ToolWorkspace(
+                tool: ToolDefinition.byId(ToolId.convert),
+                paths: paths,
+                job: job,
+                outputDirectory: scratch.path,
+                remember: false,
+                previews: previews,
+                onBack: () {},
+                onPick: () async {},
+                onChooseOutput: () async {},
+                onPathsChanged: (next) => setState(() => paths = next),
+                onOpen: (_, {bool reveal = false}) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Finder names() => find.descendant(
+        of: find.byType(OutputNameField),
+        matching: find.byType(TextField),
+      );
+      expect(names(), findsOneWidget);
+      await tester.enterText(names(), 'My photos');
+      await tester.ensureVisible(find.byTooltip('Move down').first);
+      await tester.tap(find.byTooltip('Move down').first);
+      await tester.pumpAndSettle();
+      expect(paths, originalPaths.reversed.toList());
+      await tester.ensureVisible(find.text('One combined PDF').first);
+      await tester.tap(find.text('One combined PDF').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Separate PDFs').last);
+      await tester.pumpAndSettle();
+      expect(names(), findsNWidgets(2));
+      await tester.tap(find.byKey(const Key('run-tool')));
+      await tester.pumpAndSettle();
+      expect(job.request!.combinesImagesToPdf, isFalse);
+      expect(job.request!.outputNames.keys, paths);
+      expect(job.request!.outputName, isNull);
+      await tester.ensureVisible(names().first);
+      await tester.enterText(names().first, '../invalid');
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('run-tool')))
+            .onPressed,
+        isNull,
+      );
+      await tester.ensureVisible(find.text('Separate PDFs').first);
+      await tester.tap(find.text('Separate PDFs').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('One combined PDF').last);
+      await tester.pumpAndSettle();
+      expect(names(), findsOneWidget);
+      expect(tester.widget<TextField>(names()).controller!.text, 'My photos');
+      await tester.tap(find.byKey(const Key('run-tool')));
+      await tester.pumpAndSettle();
+      expect(job.request!.combinesImagesToPdf, isTrue);
+      expect(job.request!.paths, paths);
+      expect(job.request!.outputName, 'My photos');
+      expect(job.request!.outputNames, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     'renaming is inline and invalid names disable Run before processing',
     (tester) async {
@@ -417,4 +509,12 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _RecordingJobController extends GuiJobController {
+  GuiRequest? request;
+  @override
+  Future<void> run(GuiRequest request, {bool remember = true}) async {
+    this.request = request;
+  }
 }

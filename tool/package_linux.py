@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import tarfile
+from app_version import version_info
 from linux_bundle import digest, files, manifest, validate, verify_archive
 from package_cli import third_party_notices
 
@@ -128,7 +129,7 @@ def main():
         depends = match.group(1)
         installed_kib = (sum(p.stat().st_size for p in files(stage)) + 1023) // 1024
         (control / 'control').write_text(
-            'Package: converto\nVersion: 1.0.0-preview.1\nArchitecture: amd64\n'
+            f'Package: converto\nVersion: {version_info(root)[0]}~preview.{version_info(root)[1]}\nArchitecture: amd64\n'
             'Section: utils\nPriority: optional\nMaintainer: Converto <noreply@converto.local>\n'
             f'Installed-Size: {installed_kib}\nDepends: {depends}\n'
             'Description: Private offline file tools\n'

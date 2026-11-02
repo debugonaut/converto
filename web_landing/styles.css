@@ -142,6 +142,10 @@ a {
   gap: 0.6rem;
 }
 
+.github-star-count {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Button Component Styles */
 .btn {
   display: inline-flex;
@@ -215,26 +219,6 @@ a {
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
-}
-
-.announcement-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  background-color: var(--secondary);
-  padding: 0.3rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
-  margin-bottom: 1.5rem;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: #22c55e;
 }
 
 .hero-heading {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -9,19 +10,27 @@ class AppTheme {
   static const amber = Color(0xFFF4BE64);
   static const teal = Color(0xFF78CCB4);
 
+  static TargetPlatform get platform =>
+      debugDefaultTargetPlatformOverride ??
+      (Platform.isAndroid
+          ? TargetPlatform.android
+          : Platform.isIOS
+          ? TargetPlatform.iOS
+          : Platform.isWindows
+          ? TargetPlatform.windows
+          : Platform.isMacOS
+          ? TargetPlatform.macOS
+          : TargetPlatform.linux);
+
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    platform: Platform.isWindows
-        ? TargetPlatform.windows
-        : Platform.isLinux
-        ? TargetPlatform.linux
-        : TargetPlatform.macOS,
-    fontFamily: Platform.isWindows
-        ? 'Segoe UI'
-        : Platform.isLinux
-        ? 'sans-serif'
-        : '.AppleSystemUIFont',
+    platform: platform,
+    fontFamily: switch (platform) {
+      TargetPlatform.windows => 'Segoe UI',
+      TargetPlatform.macOS => '.AppleSystemUIFont',
+      _ => 'Roboto',
+    },
     scaffoldBackgroundColor: background,
     colorScheme: const ColorScheme.dark(
       primary: amber,
@@ -71,11 +80,7 @@ class AppTheme {
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(
-          fontSize: 14,
-          fontFamily: '.AppleSystemUIFont',
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -92,10 +97,7 @@ class AppTheme {
       side: const BorderSide(color: border),
       showCheckmark: false,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-      labelStyle: const TextStyle(
-        fontSize: 13,
-        fontFamily: '.AppleSystemUIFont',
-      ),
+      labelStyle: const TextStyle(fontSize: 13),
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
     ),
     tooltipTheme: const TooltipThemeData(

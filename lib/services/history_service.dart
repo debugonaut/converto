@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'storage_service.dart';
+import 'app_paths.dart';
 
 class HistoryItem {
   final String id;
@@ -56,13 +57,7 @@ class HistoryService {
   bool _initialized = false;
 
   Future<File> _getHistoryFile() async {
-    final home =
-        Platform.environment['HOME'] ??
-        Platform.environment['USERPROFILE'] ??
-        '.';
-    final baseDir = Directory(
-      Platform.environment['CONVERTO_DATA_DIR'] ?? p.join(home, '.converto'),
-    );
+    final baseDir = Directory(AppPaths.localDataDirectory);
     if (!baseDir.existsSync()) {
       baseDir.createSync(recursive: true);
     }

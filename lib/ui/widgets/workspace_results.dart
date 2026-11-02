@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/gui_executor.dart';
+import '../../services/gui/android_documents.dart';
 import '../../services/gui/local_preview_service.dart';
 import '../tool_icons.dart';
 import 'file_preview_view.dart';
@@ -70,7 +71,7 @@ class WorkspaceResults extends StatelessWidget {
                           children: [
                             Icon(toolIcon(next.id), size: 18),
                             const SizedBox(width: 10),
-                            Text(next.title),
+                            Expanded(child: Text(next.title)),
                           ],
                         ),
                       ),
@@ -126,7 +127,13 @@ class WorkspaceResults extends StatelessWidget {
             constraints: const BoxConstraints(maxHeight: 330),
             child: ListView.builder(
               shrinkWrap: true,
-              itemExtent: 84,
+              itemExtent:
+                  84 +
+                  (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(
+                        0,
+                        50,
+                      ) *
+                      3,
               itemCount: result.outputs.length,
               itemBuilder: (context, index) {
                 final output = result.outputs[index];
@@ -161,35 +168,53 @@ class WorkspaceResults extends StatelessWidget {
                     previews,
                     openOriginal: (path) => onOpen(path),
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Preview result',
-                        onPressed: () => showLocalPreview(
-                          context,
-                          output,
-                          previews,
-                          openOriginal: (path) => onOpen(path),
+                  trailing:
+                      AndroidDocuments.enabled &&
+                          MediaQuery.sizeOf(context).width < 600
+                      ? TextButton.icon(
+                          onPressed: () => onOpen(output, reveal: true),
+                          icon: const Icon(Icons.save_alt, size: 18),
+                          label: const Text('Export'),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Preview result',
+                              onPressed: () => showLocalPreview(
+                                context,
+                                output,
+                                previews,
+                                openOriginal: (path) => onOpen(path),
+                              ),
+                              icon: const Icon(
+                                Icons.visibility_outlined,
+                                size: 19,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Open result',
+                              onPressed: () => onOpen(output),
+                              icon: const Icon(Icons.open_in_new, size: 18),
+                            ),
+                            IconButton(
+                              tooltip: AndroidDocuments.enabled
+                                  ? 'Export result'
+                                  : Platform.isWindows
+                                  ? 'Show in Explorer'
+                                  : Platform.isMacOS
+                                  ? 'Show in Finder'
+                                  : 'Show in file manager',
+                              onPressed: () => onOpen(output, reveal: true),
+                              icon: Icon(
+                                AndroidDocuments.enabled
+                                    ? Icons.save_alt
+                                    : Icons.folder_open_outlined,
+                                size: 19,
+                              ),
+                            ),
+                          ],
                         ),
-                        icon: const Icon(Icons.visibility_outlined, size: 19),
-                      ),
-                      IconButton(
-                        tooltip: 'Open result',
-                        onPressed: () => onOpen(output),
-                        icon: const Icon(Icons.open_in_new, size: 18),
-                      ),
-                      IconButton(
-                        tooltip: Platform.isWindows
-                            ? 'Show in Explorer'
-                            : Platform.isMacOS
-                            ? 'Show in Finder'
-                            : 'Show in file manager',
-                        onPressed: () => onOpen(output, reveal: true),
-                        icon: const Icon(Icons.folder_open_outlined, size: 19),
-                      ),
-                    ],
-                  ),
                 );
               },
             ),

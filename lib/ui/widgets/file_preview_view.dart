@@ -232,6 +232,7 @@ Future<void> showLocalPreview(
   LocalPreviewService service, {
   Future<void> Function(String)? openOriginal,
   int initialPage = 0,
+  Widget Function(FilePreview, Widget)? imageBuilder,
 }) async {
   await showDialog<void>(
     context: context,
@@ -240,6 +241,7 @@ Future<void> showLocalPreview(
       service: service,
       initialPage: initialPage,
       openOriginal: openOriginal,
+      imageBuilder: imageBuilder,
     ),
   );
 }
@@ -249,11 +251,13 @@ class _PreviewDialog extends StatefulWidget {
   final LocalPreviewService service;
   final Future<void> Function(String)? openOriginal;
   final int initialPage;
+  final Widget Function(FilePreview, Widget)? imageBuilder;
   const _PreviewDialog({
     required this.path,
     required this.service,
     required this.initialPage,
     this.openOriginal,
+    this.imageBuilder,
   });
   @override
   State<_PreviewDialog> createState() => _PreviewDialogState();
@@ -363,7 +367,9 @@ class _PreviewDialogState extends State<_PreviewDialog> {
                   transformationController: _transform,
                   minScale: .5,
                   maxScale: 4,
-                  child: Center(child: image),
+                  child: Center(
+                    child: widget.imageBuilder?.call(data, image) ?? image,
+                  ),
                 ),
               ),
             ),

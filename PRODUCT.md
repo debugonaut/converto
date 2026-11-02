@@ -4,11 +4,11 @@
 
 ## Platform
 
-web
+Desktop (macOS, Windows, Linux), Android, and a native CLI. The landing page is a separate static surface.
 
 ## Stack
 
-HTML5, CSS3 (shadcn design system tokens), Vanilla JavaScript. Zero runtime dependencies, 100% client-side.
+Flutter/Dart for the app and CLI, native macOS runner, bundled Rust PDF engine (`pdf_manipulator`), pure-Dart image/Office converters. Local-only processing with no runtime network dependency.
 
 ## Users
 
@@ -30,13 +30,15 @@ Works on local desktop (macOS, Windows, Linux) and mobile (Android, iOS). The we
 
 - **Supported Formats**:
   - Images: JPG, JPEG, PNG, WEBP, BMP, GIF, TIFF, ICO (convert, rotate, crop, compress, multi-image to PDF).
-  - Documents: DOCX, DOC, ODT, RTF, TXT to PDF; PDF to PNG, JPG, TXT, DOCX, XLSX, PPTX.
+  - Documents: DOCX, DOC, ODT, RTF, TXT to PDF; PDF to PNG, JPG, WebP, TXT, Markdown, HTML, DOCX, XLSX, PPTX.
   - Spreadsheets: XLSX, XLS, CSV to PDF table or CSV.
-  - Presentations: PPTX, PPT to PDF or slide images.  - **PDF Tools** (all local, no external binaries): merge, split by page count / ranges / maximum size, extract pages, reorder or delete pages, rotate, crop margins, compress (screen/ebook/print/lossless), watermark, page numbers, text redaction, password protect/unlock, PDF/A conversion, metadata inspection.
+  - Presentations: PPTX, PPT to PDF or slide images.
+  - **PDF Tools** (all local): merge, split by page count / ranges / maximum size, extract pages, reorder or delete pages, rotate, crop margins, compress (screen/ebook/print/lossless), watermark, page numbers, text redaction, password protect/unlock, PDF/A conversion, metadata/signature inspection, page-by-page comparison with an optional side-by-side HTML diff report, structural repair/sanitize, certificate signing (PKCS#12 or PEM), and HTML/Markdown extraction.
+  - **OCR** (optional local Tesseract): scanned PDF to text or searchable PDF. Never bundled or downloaded at runtime.
 - **Constraints**:
   - Zero server-side processing; zero telemetry; zero external analytics.
   - No quotas, accounts, uploads, or file-size caps other than local disk space.
-  - Self-contained bundle: the native PDF engine adds ~22 MB (32 MB total on macOS arm64); no Ghostscript, poppler, or LibreOffice install is needed for PDF work.
+  - Self-contained bundle: the native PDF engine adds ~22 MB (32 MB total on macOS arm64); no Ghostscript, poppler, or LibreOffice install is needed for PDF work. Optional local helpers add OCR (Tesseract) and genuine WebP encoding (cwebp or ImageMagick with WebP support).
   - Open source under Apache 2.0 license.
 
 ## Brand Commitments

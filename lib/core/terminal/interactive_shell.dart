@@ -117,6 +117,16 @@ class InteractiveShell {
           await _parsePdf2ImgCommand(commandArgs);
         } else if (slashCommand == '/pdf2text') {
           await _parsePdf2TextCommand(commandArgs);
+        } else if (slashCommand == '/pdf2html') {
+          await _parsePdf2HtmlCommand(commandArgs);
+        } else if (slashCommand == '/ocr') {
+          await _parseOcrCommand(commandArgs);
+        } else if (slashCommand == '/compare') {
+          await _parseCompareCommand(commandArgs);
+        } else if (slashCommand == '/repair') {
+          await _parseRepairCommand(commandArgs);
+        } else if (slashCommand == '/sign') {
+          await _parseSignCommand(commandArgs);
         } else if (slashCommand == '/pdf2office') {
           await _parsePdf2OfficeCommand(commandArgs);
         } else if (slashCommand == '/pdfa') {
@@ -720,7 +730,7 @@ class InteractiveShell {
 
   static Future<bool> _promptPdfToImages(File file) async {
     stdout.write(
-      '${TerminalUI.style('Image format', TerminalUI.bold)} (png or jpg, default png): ',
+      '${TerminalUI.style('Image format', TerminalUI.bold)} (png, jpg, or webp; default png): ',
     );
     final format =
         (await SlashPrompt.readPlainLine())?.trim().toLowerCase() ?? '';
@@ -1358,7 +1368,7 @@ class InteractiveShell {
   static Future<void> _parsePdf2TextCommand(String args) async {
     final parsed = _parseArgs(
       _tokenize(args),
-      valueOptions: {'--output', '-o'},
+      valueOptions: {'--to', '-t', '--output', '-o', '--password', '-p'},
       boolFlags: {'--print'},
     );
     final file = await _requirePdf(
@@ -1367,9 +1377,17 @@ class InteractiveShell {
     );
     if (file == null) return;
 
+    var format = _option(parsed, ['--to', '-t']);
+    if (format == null && parsed.positional.length >= 2) {
+      format = parsed.positional[1];
+    }
+    format = (format ?? 'txt').replaceAll('.', '').toLowerCase();
+
     try {
       final result = await PdfConverter().pdfToText(
         pdfFile: file,
+        targetFormat: format,
+        password: _option(parsed, ['--password', '-p']),
         outputPath: _option(parsed, ['--output', '-o']),
         onProgress: (p) =>
             TerminalUI.printProgressBar(p, label: 'Extracting text...'),
@@ -1383,6 +1401,293 @@ class InteractiveShell {
     } catch (e) {
       exitCode = 1;
       _pdfFailure('Text extraction', e);
+    }
+  }
+
+  static Future<void> _parsePdf2HtmlCommand(String args) async {
+    final parsed = _parseArgs(
+      _tokenize(args),
+      valueOptions: {'--output', '-o', '--password', '-p'},
+      boolFlags: {'--print', '--layout'},
+    );
+    final file = await _requirePdf(parsed.positional.firstOrNull, 'convert');
+    if (file == null) return;
+
+    try {
+      final converter = PdfConverter();
+      final result = _hasFlag(parsed, '--layout')
+          ? await converter.pdfToHtmlVisual(
+              pdfFile: file,
+              password: _option(parsed, ['--password', '-p']),
+              outputPath: _option(parsed, ['--output', '-o']),
+              onProgress: (p) =>
+                  TerminalUI.printProgressBar(p, label: 'Rendering pages...'),
+            )
+          : await converter.pdfToText(
+              pdfFile: file,
+              targetFormat: 'html',
+              password: _option(parsed, ['--password', '-p']),
+              outputPath: _option(parsed, ['--output', '-o']),
+              onProgress: (p) =>
+                  TerminalUI.printProgressBar(p, label: 'Building HTML...'),
+            );
+      TerminalUI.success('HTML written successfully!');
+      if (_hasFlag(parsed, '--print')) {
+        stdout.writeln();
+        stdout.writeln(await result.readAsString());
+      }
+      await _printSavedFiles([result]);
+    } catch (e) {
+      exitCode = 1;
+      _pdfFailure('PDF to HTML', e);
+    }
+  }
+
+  static Future<void> _parseOcrCommand(String args) async {
+    final parsed = _parseArgs(
+      _tokenize(args),
+      valueOptions: {
+        '--lang',
+        '--dpi',
+        '--password',
+        '-p',
+        '--output',
+        '-o',
+        '--pdf',
+      },
+      boolFlags: {'--searchable'},
+    );
+    final file = await _requirePdf(parsed.positional.firstOrNull, 'run OCR');
+    if (file == null) return;
+
+    try {
+      final pdfPath = _option(parsed, ['--pdf']);
+      final result = await PdfEngine.ocr(
+        sourceFile: file,
+        language: _option(parsed, ['--lang']) ?? 'eng',
+        dpi: int.tryParse(_option(parsed, ['--dpi']) ?? '300') ?? 300,
+        searchablePdf: _hasFlag(parsed, '--searchable') || pdfPath != null,
+        password: _option(parsed, ['--password', '-p']),
+        outputPath: _option(parsed, ['--output', '-o']),
+        pdfOutputPath: pdfPath,
+        onProgress: (p) =>
+            TerminalUI.printProgressBar(p, label: 'Recognizing text...'),
+      );
+      TerminalUI.success(
+        'OCR finished: ${result.characters} characters across '
+        '${result.pageCount} page${result.pageCount == 1 ? '' : 's'}',
+      );
+      await _printSavedFiles([
+        result.textFile,
+        if (result.pdfFile != null) result.pdfFile!,
+      ]);
+    } catch (e) {
+      exitCode = 1;
+      _pdfFailure('OCR', e);
+    }
+  }
+
+  static Future<void> _parseCompareCommand(String args) async {
+    final parsed = _parseArgs(
+      _tokenize(args),
+      valueOptions: {
+        '--left-password',
+        '--right-password',
+        '--dpi',
+        '--report',
+      },
+      boolFlags: {'--fail-on-diff'},
+    );
+
+    var paths = parsed.positional;
+    if (paths.length < 2) {
+      stdout.write(
+        '${TerminalUI.style('First PDF', TerminalUI.bold)} (or drag & drop): ',
+      );
+      final first = await SlashPrompt.readPlainLine();
+      stdout.write(
+        '${TerminalUI.style('Second PDF', TerminalUI.bold)} (or drag & drop): ',
+      );
+      final second = await SlashPrompt.readPlainLine();
+      if (first == null || first.trim().isEmpty) return;
+      if (second == null || second.trim().isEmpty) return;
+      paths = [..._tokenize(first), ..._tokenize(second)];
+    }
+    if (paths.length < 2) {
+      TerminalUI.error('Compare needs two PDF files.');
+      return;
+    }
+
+    final left = await _requirePdf(paths[0], 'compare');
+    final right = await _requirePdf(paths[1], 'compare');
+    if (left == null || right == null) return;
+
+    try {
+      final result = await PdfEngine.compare(
+        leftFile: left,
+        rightFile: right,
+        leftPassword: _option(parsed, ['--left-password']),
+        rightPassword: _option(parsed, ['--right-password']),
+        dpi: int.tryParse(_option(parsed, ['--dpi']) ?? '72') ?? 72,
+        reportPath: _option(parsed, ['--report']),
+      );
+      final verdict = result.identical
+          ? 'Identical on every shared page'
+          : result.changedPages.isEmpty && result.details.isNotEmpty
+          ? result.details.first
+          : '${result.changedPages.length} changed page'
+                '${result.changedPages.length == 1 ? '' : 's'}';
+      TerminalUI.printBox(
+        title: 'PDF Comparison',
+        lines: [
+          '${TerminalUI.style("Left:    ", TerminalUI.gray)}${left.path} (${result.leftPages} pages)',
+          '${TerminalUI.style("Right:   ", TerminalUI.gray)}${right.path} (${result.rightPages} pages)',
+          '${TerminalUI.style("Verdict: ", TerminalUI.gray)}$verdict',
+        ],
+        borderColor: result.identical ? TerminalUI.green : TerminalUI.amber,
+      );
+      for (final detail in result.details.take(30)) {
+        stdout.writeln('  ${TerminalUI.style("•", TerminalUI.amber)} $detail');
+      }
+      if (result.details.length > 30) {
+        stdout.writeln(
+          '  ${TerminalUI.style("... ${result.details.length - 30} more differences", TerminalUI.dim)}',
+        );
+      }
+      if (result.report != null) {
+        await _printSavedFiles([result.report!]);
+      }
+      if (result.identical) {
+        TerminalUI.success('PDFs are identical!');
+      } else if (_hasFlag(parsed, '--fail-on-diff')) {
+        exitCode = 1;
+      }
+    } catch (e) {
+      exitCode = 1;
+      _pdfFailure('Comparison', e);
+    }
+  }
+
+  static Future<void> _parseRepairCommand(String args) async {
+    final parsed = _parseArgs(
+      _tokenize(args),
+      valueOptions: {'--output', '-o', '--password', '-p'},
+      boolFlags: {'--sanitize'},
+    );
+    final file = await _requirePdf(parsed.positional.firstOrNull, 'repair');
+    if (file == null) return;
+
+    try {
+      final sanitize = _hasFlag(parsed, '--sanitize');
+      final password = _option(parsed, ['--password', '-p']);
+      final result = await PdfEngine.repair(
+        sourceFile: file,
+        sanitize: sanitize,
+        password: password,
+        outputPath: _option(parsed, ['--output', '-o']),
+        onProgress: (p) =>
+            TerminalUI.printProgressBar(p, label: 'Rebuilding PDF...'),
+      );
+      var pages = '?';
+      try {
+        pages =
+            '${(await PdfEngine.info(result, password: password)).pageCount}';
+      } catch (_) {}
+      TerminalUI.success(
+        'PDF rebuilt${sanitize ? ' and sanitized' : ''} ($pages pages)',
+      );
+      await _printSavedFiles([result]);
+    } catch (e) {
+      exitCode = 1;
+      _pdfFailure('Repair', e);
+    }
+  }
+
+  static Future<void> _parseSignCommand(String args) async {
+    final parsed = _parseArgs(
+      _tokenize(args),
+      valueOptions: {
+        '--p12',
+        '--p12-password',
+        '--cert',
+        '--key',
+        '--reason',
+        '--location',
+        '--output',
+        '-o',
+      },
+    );
+    final file = await _requirePdf(parsed.positional.firstOrNull, 'sign');
+    if (file == null) return;
+
+    var p12 = _option(parsed, ['--p12']);
+    var cert = _option(parsed, ['--cert']);
+    var key = _option(parsed, ['--key']);
+
+    if (p12 == null && (cert == null || key == null)) {
+      stdout.write(
+        '${TerminalUI.style('PKCS#12 (.p12/.pfx) path', TerminalUI.bold)} '
+        '(or type "pem" for separate cert/key): ',
+      );
+      final answer = (await SlashPrompt.readPlainLine())?.trim() ?? '';
+      if (answer.isEmpty) return;
+      if (answer.toLowerCase() == 'pem') {
+        stdout.write(
+          '${TerminalUI.style('PEM certificate path', TerminalUI.bold)}: ',
+        );
+        final rawCert = (await SlashPrompt.readPlainLine())?.trim();
+        cert = rawCert == null ? null : sanitizeToken(rawCert);
+        stdout.write(
+          '${TerminalUI.style('PEM private key path', TerminalUI.bold)}: ',
+        );
+        final rawKey = (await SlashPrompt.readPlainLine())?.trim();
+        key = rawKey == null ? null : sanitizeToken(rawKey);
+        if (cert == null || cert.isEmpty || key == null || key.isEmpty) {
+          TerminalUI.error('Both a certificate and private key are required.');
+          return;
+        }
+      } else {
+        p12 = sanitizeToken(answer);
+      }
+    }
+
+    try {
+      var password = _option(parsed, ['--p12-password']);
+      if (p12 != null && password == null) {
+        password = await _readSecret(
+          '${TerminalUI.style('PKCS#12 password', TerminalUI.bold)} '
+          '(blank if none): ',
+        );
+      }
+
+      final result = await PdfEngine.sign(
+        sourceFile: file,
+        p12Path: p12,
+        p12Password: password,
+        certPath: cert,
+        keyPath: key,
+        reason: _option(parsed, ['--reason']),
+        location: _option(parsed, ['--location']),
+        outputPath: _option(parsed, ['--output', '-o']),
+        onProgress: (p) =>
+            TerminalUI.printProgressBar(p, label: 'Signing PDF...'),
+      );
+      TerminalUI.success('PDF signed successfully!');
+      await _printSavedFiles([result]);
+
+      try {
+        final info = await PdfEngine.info(result);
+        if (info.signaturesValid == true) {
+          TerminalUI.success('Signature verified valid!');
+        } else if (info.signaturesValid == false) {
+          stdout.writeln(
+            '  ${TerminalUI.style('Signature is present; the trust chain could not be verified.', TerminalUI.amber)}',
+          );
+        }
+      } catch (_) {}
+    } catch (e) {
+      exitCode = 1;
+      _pdfFailure('Sign', e);
     }
   }
 
@@ -1499,6 +1804,11 @@ class InteractiveShell {
         file,
         password: _option(parsed, ['--password', '-p']),
       );
+      final signatureStatus = info.signatureSummaries.isEmpty
+          ? 'none'
+          : info.signaturesValid == true
+          ? 'valid'
+          : 'present (unverified)';
       TerminalUI.printBox(
         title: 'PDF Details',
         lines: [
@@ -1509,6 +1819,9 @@ class InteractiveShell {
           '${TerminalUI.style("Page size: ", TerminalUI.gray)}${info.firstPageWidth.toStringAsFixed(0)} × ${info.firstPageHeight.toStringAsFixed(0)} pt${info.rotation != 0 ? ' (rotated ${info.rotation}°)' : ''}',
           '${TerminalUI.style("Encrypted: ", TerminalUI.gray)}${info.isEncrypted ? 'yes' : 'no'}',
           '${TerminalUI.style("Tagged:    ", TerminalUI.gray)}${info.isTagged ? 'yes (accessible)' : 'no'}',
+          '${TerminalUI.style("Signed:    ", TerminalUI.gray)}$signatureStatus',
+          for (final signature in info.signatureSummaries)
+            '${TerminalUI.style("           ", TerminalUI.gray)}${TerminalUI.fit(signature, 54)}',
           '${TerminalUI.style("Title:     ", TerminalUI.gray)}${info.title ?? '—'}',
           '${TerminalUI.style("Author:    ", TerminalUI.gray)}${info.author ?? '—'}',
           '${TerminalUI.style("Subject:   ", TerminalUI.gray)}${info.subject ?? '—'}',
@@ -1607,7 +1920,7 @@ class InteractiveShell {
         (parsed.positional.length >= 2 ? parsed.positional[1] : null);
     if (fmt == null) {
       stdout.write(
-        '${TerminalUI.style('Output format', TerminalUI.bold)} (png or jpg, default png): ',
+        '${TerminalUI.style('Output format', TerminalUI.bold)} (png, jpg, or webp; default png): ',
       );
       fmt = (await SlashPrompt.readPlainLine())?.trim() ?? 'png';
     }
@@ -1623,7 +1936,7 @@ class InteractiveShell {
     final explicitFile =
         rawOutput != null &&
         !Directory(rawOutput).existsSync() &&
-        ['png', 'jpg', 'jpeg'].contains(outputExt);
+        ['png', 'jpg', 'jpeg', 'webp'].contains(outputExt);
 
     await _executePdf2Img(
       file,
@@ -1807,6 +2120,8 @@ class InteractiveShell {
 
   static Future<void> _showFormats() async {
     final caps = await PlatformDetector.detect();
+    final tesseract = await PdfEngine.tesseractVersion();
+    final hasWebp = await PdfEngine.hasWebpEncoder();
 
     TerminalUI.printBox(
       title: 'Platform Capabilities',
@@ -1814,6 +2129,8 @@ class InteractiveShell {
         '${TerminalUI.style("Platform:        ", TerminalUI.gray)}${caps.isWindows ? "Windows" : (caps.isAndroid ? "Android" : (caps.isMacOS ? "macOS" : "Linux"))}',
         '${TerminalUI.style("PDF Engine:      ", TerminalUI.gray)}${TerminalUI.style("● Bundled native engine (offline)", TerminalUI.green)}',
         '${TerminalUI.style("LibreOffice CLI: ", TerminalUI.gray)}${caps.hasLibreOfficeCLI ? TerminalUI.style("● Available (${caps.libreOfficePath})", TerminalUI.green) : TerminalUI.style("○ Fallback active", TerminalUI.gray)}',
+        '${TerminalUI.style("OCR:             ", TerminalUI.gray)}${tesseract == null ? TerminalUI.style("○ Tesseract not installed (optional)", TerminalUI.gray) : TerminalUI.style("● ${TerminalUI.fit(tesseract, 34)}", TerminalUI.green)}',
+        '${TerminalUI.style("WebP encoder:    ", TerminalUI.gray)}${hasWebp ? TerminalUI.style("● Available", TerminalUI.green) : TerminalUI.style("○ cwebp/ImageMagick not installed (optional)", TerminalUI.gray)}',
       ],
       borderColor: TerminalUI.cyan,
     );

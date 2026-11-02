@@ -9,9 +9,14 @@ node_modules/
 __pycache__/
 *.pyc
 
+# Local landing-page download bundles (verified CI artifacts)
+web_landing/downloads/*.zip
+
 # Machine-specific native build configuration
 android/.gradle/
 android/local.properties
+android/.kotlin/
+.toolchains/
 windows/flutter/ephemeral/
 macos/Flutter/ephemeral/
 ios/Flutter/ephemeral/
@@ -22,4 +27,10 @@ Pods/
 .env.*
 !.env.example
 .freebuff/
+.cloud-attachments/
 .DS_Store
+
+web_landing/downloads/*.tar.gz
+
+web_landing/downloads/*.deb
+web_landing/downloads/*.apk

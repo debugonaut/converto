@@ -21,6 +21,7 @@ void main() {
       expect(filterCommands('/pdf').map((item) => item.command), [
         '/pdf2img',
         '/pdf2text',
+        '/pdf2html',
         '/pdf2office',
         '/pdfa',
       ]);

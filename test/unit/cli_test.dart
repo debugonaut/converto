@@ -224,6 +224,91 @@ void main() {
       expect(File(docxPath).lengthSync(), greaterThan(0));
     });
 
+    test('CLI pdf2html and pdf2text markdown produce structured output', () {
+      final htmlPath = '${tempDir.path}/notes.html';
+      var res = runCli(['pdf2html', 'test_assets/notes.pdf', '-o', htmlPath]);
+      expect(res.exitCode, 0, reason: res.stderr.toString());
+      final html = File(htmlPath).readAsStringSync();
+      expect(html, contains('<p>'));
+      expect(html, contains('OfflineConvert'));
+
+      final mdPath = '${tempDir.path}/notes.md';
+      res = runCli([
+        'pdf2text',
+        'test_assets/notes.pdf',
+        '--to',
+        'md',
+        '-o',
+        mdPath,
+      ]);
+      expect(res.exitCode, 0, reason: res.stderr.toString());
+      expect(File(mdPath).readAsStringSync(), contains('OfflineConvert'));
+
+      final layoutPath = '${tempDir.path}/notes_layout.html';
+      res = runCli([
+        'pdf2html',
+        'test_assets/notes.pdf',
+        '--layout',
+        '-o',
+        layoutPath,
+      ]);
+      expect(res.exitCode, 0, reason: res.stderr.toString());
+      expect(
+        File(layoutPath).readAsStringSync(),
+        contains('data:image/png;base64,'),
+      );
+    });
+
+    test('CLI compare reports identical and changed PDFs', () {
+      var res = runCli([
+        'compare',
+        'test_assets/budget.pdf',
+        'test_assets/budget.pdf',
+      ]);
+      expect(res.exitCode, 0);
+      expect(res.stdout.toString(), contains('Identical on every shared page'));
+
+      res = runCli([
+        'compare',
+        'test_assets/budget.pdf',
+        'test_assets/notes.pdf',
+        '--fail-on-diff',
+      ]);
+      expect(res.exitCode, 1);
+      expect(res.stdout.toString(), contains('changed page'));
+      expect(res.stdout.toString(), contains('text differs'));
+      expect(res.stdout.toString(), contains('+"'));
+
+      final report = '${tempDir.path}/comparison.html';
+      res = runCli([
+        'compare',
+        'test_assets/budget.pdf',
+        'test_assets/notes.pdf',
+        '--report',
+        report,
+      ]);
+      expect(res.exitCode, 0, reason: res.stderr.toString());
+      final html = File(report).readAsStringSync();
+      expect(html, contains('<!DOCTYPE html>'));
+      expect(html, contains('data:image/png;base64,'));
+      expect(html, contains('Page 1'));
+    });
+
+    test('CLI repair rebuilds a truncated PDF', () {
+      final source = File('test_assets/budget.pdf');
+      final truncated = File('${tempDir.path}/truncated.pdf')
+        ..writeAsBytesSync(source.readAsBytesSync().take(1200).toList());
+      final repaired = '${tempDir.path}/repaired.pdf';
+
+      final res = runCli(['repair', truncated.path, '-o', repaired]);
+      expect(res.exitCode, 0, reason: res.stderr.toString());
+      expect(File(repaired).lengthSync(), greaterThan(0));
+
+      final info = runCli(['info', repaired]);
+      expect(info.exitCode, 0);
+      expect(info.stdout.toString(), contains('Pages:     1'));
+    });
+
     test('CLI pdf2img exports every page', () {
       final outDir = '${tempDir.path}/pages';
       final res = runCli([

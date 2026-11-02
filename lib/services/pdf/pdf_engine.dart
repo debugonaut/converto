@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
@@ -13,9 +15,11 @@ import 'page_number_bridge.dart';
 /// converter could not do on its own.
 ///
 /// It replaces the Ghostscript / pdfunite / pdftoppm requirements for:
-/// merge, watermark, page rendering, split, compress, rotate, protect, and
-/// unlock. Everything runs on the user's machine; no network calls and no
-/// per-file quotas.
+/// merge, watermark, page rendering, split, compress, rotate, protect,
+/// unlock, extract, compare, repair/sanitize, signing, OCR orchestration,
+/// and HTML/Markdown/Office export. Everything runs on the user's machine;
+/// no network calls and no per-file quotas. Optional helpers (Tesseract,
+/// cwebp) are detected locally and never downloaded.
 class PdfEngine {
   static Pdf? _pdf;
 
@@ -46,6 +50,479 @@ class PdfEngine {
     } finally {
       await doc.dispose();
     }
+  }
+
+  /// Extracts the whole document as `txt`, `md` (Markdown), or `html`.
+  ///
+  /// The bundled engine converts layout, headings, lists, tables, and
+  /// images locally; nothing is uploaded.
+  static Future<String> extractAs(
+    File sourceFile,
+    String format, {
+    String? password,
+  }) async {
+    final target = switch (format.replaceAll('.', '').toLowerCase()) {
+      'txt' || 'text' => PdfExtractionFormat.text,
+      'md' || 'markdown' => PdfExtractionFormat.markdown,
+      'html' || 'htm' => PdfExtractionFormat.html,
+      'plain' => PdfExtractionFormat.plainText,
+      _ => throw ArgumentError(
+        'PDF export supports txt, md, or html, not .$format.',
+      ),
+    };
+
+    final doc = await _instance.open(
+      FileSource(sourceFile),
+      password: password,
+    );
+    try {
+      return await doc.extract(pages: const PdfPages.all(), format: target);
+    } finally {
+      await doc.dispose();
+    }
+  }
+
+  /// Digitally signs a PDF with a local PKCS#12 bundle or PEM cert/key.
+  ///
+  /// The private key never leaves the machine. The source is only read;
+  /// a separate signed PDF is written.
+  static Future<File> sign({
+    required File sourceFile,
+    String? p12Path,
+    String? p12Password,
+    String? certPath,
+    String? keyPath,
+    String? reason,
+    String? location,
+    String? outputPath,
+    void Function(double progress)? onProgress,
+  }) async {
+    if (p12Path == null && (certPath == null || keyPath == null)) {
+      throw ArgumentError(
+        'Provide a .p12/.pfx bundle, or both a certificate and key PEM.',
+      );
+    }
+
+    PdfSigningCredentials credentials;
+    if (p12Path != null) {
+      final bundle = File(p12Path);
+      if (!bundle.existsSync()) {
+        throw ArgumentError('Signing bundle not found: ${bundle.path}');
+      }
+      credentials = PdfSigningCredentials.pkcs12(
+        await bundle.readAsBytes(),
+        p12Password ?? '',
+      );
+    } else {
+      final cert = File(certPath!);
+      final key = File(keyPath!);
+      if (!cert.existsSync()) {
+        throw ArgumentError('Certificate not found: ${cert.path}');
+      }
+      if (!key.existsSync()) {
+        throw ArgumentError('Private key not found: ${key.path}');
+      }
+      credentials = PdfSigningCredentials.pem(
+        await cert.readAsString(),
+        await key.readAsString(),
+      );
+    }
+
+    final base = FileUtils.getBaseNameWithoutExtension(sourceFile.path);
+    final output = await StorageService().resolveOutputFile(
+      originalName: '${base}_signed',
+      targetExtension: 'pdf',
+      explicitDestinationPath: outputPath,
+    );
+
+    onProgress?.call(0.1);
+    Future<void> writeSignature(File input) async {
+      await _writeAtomically(output, (sink) async {
+        await _instance.sign(
+          FileSource(input),
+          sink,
+          credentials: credentials,
+          reason: reason,
+          location: location,
+        );
+      });
+    }
+
+    try {
+      await writeSignature(sourceFile);
+    } catch (originalError) {
+      // Older and third-party PDFs sometimes have a trailer without /Size;
+      // signing is stricter than rendering. Rebuild a private copy first so
+      // the user never has to know about the malformed trailer.
+      final staging = await Directory.systemTemp.createTemp('converto-sign-');
+      try {
+        final repaired = await repair(
+          sourceFile: sourceFile,
+          outputPath: '${staging.path}${Platform.pathSeparator}repaired.pdf',
+        );
+        onProgress?.call(0.5);
+        await writeSignature(repaired);
+      } catch (_) {
+        throw originalError;
+      } finally {
+        if (staging.existsSync()) await staging.delete(recursive: true);
+      }
+    }
+    onProgress?.call(1.0);
+    return output;
+  }
+
+  /// Compares two PDFs locally.
+  ///
+  /// Text is compared per page first; pages without a text layer fall back
+  /// to a low-DPI pixel comparison so scans are still caught.
+  static Future<PdfCompareResult> compare({
+    required File leftFile,
+    required File rightFile,
+    String? leftPassword,
+    String? rightPassword,
+    int dpi = 72,
+    double pixelThreshold = 0.002,
+    String? reportPath,
+  }) async {
+    if (dpi < 36) throw ArgumentError('Comparison DPI must be at least 36.');
+    if (pixelThreshold < 0 || pixelThreshold > 1) {
+      throw ArgumentError('Pixel threshold must be between 0 and 1.');
+    }
+
+    File? report;
+    if (reportPath != null) {
+      report = await StorageService().resolveOutputFile(
+        originalName:
+            '${FileUtils.getBaseNameWithoutExtension(leftFile.path)}_vs_'
+            '${FileUtils.getBaseNameWithoutExtension(rightFile.path)}',
+        targetExtension: 'html',
+        explicitDestinationPath: reportPath,
+      );
+    }
+
+    final left = await _instance.open(
+      FileSource(leftFile),
+      password: leftPassword,
+    );
+    final changed = <int>[];
+    final details = <String>[];
+    final reportPages = <_CompareReportPage>[];
+    final leftPages = left.pageCount;
+    var rightPages = 0;
+
+    try {
+      final right = await _instance.open(
+        FileSource(rightFile),
+        password: rightPassword,
+      );
+      rightPages = right.pageCount;
+      try {
+        final shared = math.min(leftPages, rightPages);
+        for (var index = 0; index < shared; index++) {
+          final leftText = _normalizeText(
+            await left.extract(
+              pages: PdfPages.single(index),
+              format: PdfExtractionFormat.plainText,
+            ),
+          );
+          final rightText = _normalizeText(
+            await right.extract(
+              pages: PdfPages.single(index),
+              format: PdfExtractionFormat.plainText,
+            ),
+          );
+
+          final leftBytes = await _renderPage(left, index, dpi);
+          final rightBytes = await _renderPage(right, index, dpi);
+          final reasons = <String>[];
+          img.Image? leftImage;
+          img.Image? rightImage;
+          if (leftText != rightText) {
+            reasons.add(_describeTextDiff(leftText, rightText));
+          }
+
+          if (leftBytes == null || rightBytes == null) {
+            if (leftBytes != rightBytes) {
+              reasons.add('could not render one page');
+            }
+          } else if (!_sameBytes(leftBytes, rightBytes)) {
+            leftImage = img.decodePng(leftBytes);
+            rightImage = img.decodePng(rightBytes);
+            if (leftImage == null || rightImage == null) {
+              reasons.add('could not decode a page image');
+            } else {
+              final ratio = _pixelDifference(leftImage, rightImage);
+              if (ratio > pixelThreshold) {
+                reasons.add(
+                  '${(ratio * 100).toStringAsFixed(2)}% pixels differ',
+                );
+              }
+            }
+          }
+
+          if (reasons.isNotEmpty) {
+            changed.add(index);
+            details.add('Page ${index + 1}: ${reasons.join(', ')}');
+          }
+
+          if (report != null && reasons.isNotEmpty) {
+            leftImage ??= leftBytes == null ? null : img.decodePng(leftBytes);
+            rightImage ??= rightBytes == null
+                ? null
+                : img.decodePng(rightBytes);
+            final regions = leftImage != null && rightImage != null
+                ? _diffRegions(leftImage, rightImage)
+                : const <_DiffRect>[];
+            reportPages.add(
+              _CompareReportPage(
+                page: index + 1,
+                leftPng: leftBytes == null
+                    ? null
+                    : _annotateDiff(leftBytes, leftImage, regions),
+                rightPng: rightBytes == null
+                    ? null
+                    : _annotateDiff(rightBytes, rightImage, regions),
+                summary: reasons.join(', '),
+              ),
+            );
+          }
+        }
+
+        if (leftPages != rightPages) {
+          details.add('Page count differs: $leftPages vs $rightPages');
+          if (report != null) {
+            // Extra pages are part of the difference, so show which side owns
+            // them instead of leaving the report with nothing to render.
+            final longest = math.max(leftPages, rightPages);
+            for (var index = shared; index < longest; index++) {
+              final inLeft = index < leftPages;
+              final inRight = index < rightPages;
+              reportPages.add(
+                _CompareReportPage(
+                  page: index + 1,
+                  leftPng: inLeft ? await _renderPage(left, index, dpi) : null,
+                  rightPng: inRight
+                      ? await _renderPage(right, index, dpi)
+                      : null,
+                  summary: inLeft && !inRight
+                      ? 'Extra page: present only in the left PDF'
+                      : !inLeft && inRight
+                      ? 'Extra page: present only in the right PDF'
+                      : 'Page present in both PDFs',
+                ),
+              );
+            }
+          }
+        }
+      } finally {
+        await right.dispose();
+      }
+    } finally {
+      await left.dispose();
+    }
+
+    final result = PdfCompareResult(
+      leftPages: leftPages,
+      rightPages: rightPages,
+      changedPages: changed,
+      details: details,
+      report: report,
+    );
+    if (report != null) {
+      final html = _buildCompareReport(
+        leftFile: leftFile,
+        rightFile: rightFile,
+        result: result,
+        pages: reportPages,
+      );
+      await StorageService.writeAtomically(
+        report,
+        (temp) => temp.writeAsString(html, flush: true),
+      );
+    }
+    return result;
+  }
+
+  /// Rewrites a PDF through the engine to rebuild broken cross-reference
+  /// tables and object streams. With [sanitize], it also strips metadata,
+  /// JavaScript, and embedded files.
+  static Future<File> repair({
+    required File sourceFile,
+    bool sanitize = false,
+    String? password,
+    String? outputPath,
+    void Function(double progress)? onProgress,
+  }) async {
+    final base = FileUtils.getBaseNameWithoutExtension(sourceFile.path);
+    final output = await StorageService().resolveOutputFile(
+      originalName: '${base}_repaired',
+      targetExtension: 'pdf',
+      explicitDestinationPath: outputPath,
+    );
+
+    onProgress?.call(0.2);
+    final editor = await _instance.edit(
+      FileSource(sourceFile),
+      password: password,
+    );
+    try {
+      if (sanitize) {
+        await editor.sanitize(
+          const PdfSanitizeOptions(
+            metadata: true,
+            javascript: true,
+            embeddedFiles: true,
+          ),
+        );
+      }
+      await _writeAtomically(output, (sink) async {
+        await editor.save(
+          sink,
+          options: const PdfSaveOptions.fullRewrite(
+            compress: true,
+            garbageCollect: true,
+          ),
+        );
+      });
+    } finally {
+      await editor.dispose();
+    }
+    onProgress?.call(1.0);
+    return output;
+  }
+
+  /// Extracts a text layer with a locally installed Tesseract OCR.
+  ///
+  /// Tesseract is optional and detected at runtime; Converto never downloads
+  /// it. With [searchablePdf], a PDF containing the recognized text layer is
+  /// also written.
+  static Future<PdfOcrResult> ocr({
+    required File sourceFile,
+    String language = 'eng',
+    int dpi = 300,
+    bool searchablePdf = false,
+    String? password,
+    String? outputPath,
+    String? pdfOutputPath,
+    void Function(double progress)? onProgress,
+  }) async {
+    if (dpi < 72) throw ArgumentError('OCR DPI must be at least 72.');
+    final tesseract = await _findTesseract();
+    if (tesseract == null) {
+      throw PdfToolUnavailable(
+        'OCR needs a local Tesseract installation. Install it with your '
+        'package manager (macOS: brew install tesseract; Linux: apt install '
+        'tesseract-ocr; Windows: winget install UB-Mannheim.TesseractOCR). '
+        'Converto never downloads it for you.',
+      );
+    }
+
+    final base = FileUtils.getBaseNameWithoutExtension(sourceFile.path);
+    final textFile = await StorageService().resolveOutputFile(
+      originalName: '${base}_ocr',
+      targetExtension: 'txt',
+      explicitDestinationPath: outputPath,
+    );
+    final temporary = await Directory.systemTemp.createTemp('converto-ocr-');
+    final pagePdfs = <File>[];
+
+    try {
+      final images = await renderPages(
+        sourceFile: sourceFile,
+        targetFormat: 'png',
+        dpi: dpi,
+        password: password,
+        outputDirectory: temporary.path,
+        onProgress: (p) => onProgress?.call(p * 0.5),
+      );
+
+      final text = StringBuffer();
+      for (var index = 0; index < images.length; index++) {
+        final image = images[index];
+        final result = await Process.run(tesseract, [
+          image.path,
+          'stdout',
+          '-l',
+          language,
+        ]);
+        if (result.exitCode != 0) {
+          throw PdfToolUnavailable(
+            'OCR failed on page ${index + 1}: ${result.stderr.toString().trim()}',
+          );
+        }
+        final pageText = result.stdout.toString();
+        if (index > 0) text.write('\n\f\n');
+        text.write(pageText);
+
+        if (searchablePdf) {
+          final pageBase =
+              '${temporary.path}${Platform.pathSeparator}searchable_$index';
+          final pdfResult = await Process.run(tesseract, [
+            image.path,
+            pageBase,
+            '-l',
+            language,
+            'pdf',
+          ]);
+          if (pdfResult.exitCode != 0) {
+            throw PdfToolUnavailable(
+              'OCR PDF failed on page ${index + 1}: ${pdfResult.stderr.toString().trim()}',
+            );
+          }
+          final pagePdf = File('$pageBase.pdf');
+          if (!pagePdf.existsSync()) {
+            throw PdfToolUnavailable(
+              'OCR did not produce a PDF for page ${index + 1}.',
+            );
+          }
+          pagePdfs.add(pagePdf);
+        }
+        onProgress?.call(0.5 + 0.4 * ((index + 1) / images.length));
+      }
+
+      final extracted = text.toString();
+      await StorageService.writeAtomically(
+        textFile,
+        (temp) => temp.writeAsString(extracted, flush: true),
+      );
+
+      File? searchable;
+      if (searchablePdf) {
+        searchable = await StorageService().resolveOutputFile(
+          originalName: '${base}_ocr',
+          targetExtension: 'pdf',
+          explicitDestinationPath: pdfOutputPath,
+        );
+        await _writeAtomically(searchable, (sink) async {
+          await _instance.merge(pagePdfs.map(FileSource.new).toList(), sink);
+        });
+      }
+
+      onProgress?.call(1.0);
+      return PdfOcrResult(
+        textFile: textFile,
+        pdfFile: searchable,
+        pageCount: images.length,
+        characters: extracted.length,
+      );
+    } finally {
+      if (temporary.existsSync()) {
+        await temporary.delete(recursive: true);
+      }
+    }
+  }
+
+  /// Whether a local encoder can actually write WebP right now.
+  static Future<bool> hasWebpEncoder() => _hasWebpEncoder();
+
+  /// Returns the Tesseract executable version, or null when it is absent.
+  static Future<String?> tesseractVersion() async {
+    final tesseract = await _findTesseract();
+    if (tesseract == null) return null;
+    final result = await Process.run(tesseract, ['--version']);
+    if (result.exitCode != 0) return null;
+    return result.stdout.toString().split('\n').first.trim();
   }
 
   static Future<File> merge({
@@ -116,6 +593,42 @@ class PdfEngine {
     return output;
   }
 
+  /// Yields one rendered page at a time, retaining its displayed PDF dimensions.
+  static Stream<PdfRasterPage> rasterizePages({
+    required File sourceFile,
+    int dpi = 150,
+  }) async* {
+    if (dpi < 1) throw ArgumentError('DPI must be positive.');
+    final doc = await _instance.open(FileSource(sourceFile));
+    try {
+      for (var index = 0; index < doc.pageCount; index++) {
+        final info = doc.pages[index];
+        Uint8List? bytes;
+        await for (final page in doc.render(
+          pages: PdfPages.single(index),
+          size: PdfRenderSize(
+            maxWidth: math.max(1, (info.effectiveWidth * dpi / 72).round()),
+            maxHeight: math.max(1, (info.effectiveHeight * dpi / 72).round()),
+          ),
+        )) {
+          bytes = page.data;
+          break;
+        }
+        if (bytes == null || bytes.isEmpty) {
+          throw StateError('Page ${index + 1} did not render.');
+        }
+        yield PdfRasterPage(
+          bytes,
+          info.effectiveWidth,
+          info.effectiveHeight,
+          doc.pageCount,
+        );
+      }
+    } finally {
+      await doc.dispose();
+    }
+  }
+
   /// Renders pages, writing one image per page.
   ///
   /// [maxPages] limits the work (used by the single-file converter); null
@@ -127,6 +640,7 @@ class PdfEngine {
     String targetFormat = 'png',
     int dpi = 150,
     int? maxPages,
+    String? password,
     String? outputDirectory,
     String? firstPageOutputPath,
     void Function(double progress)? onProgress,
@@ -136,9 +650,16 @@ class PdfEngine {
     if (maxPages != null && maxPages < 1)
       throw ArgumentError('Page limit must be positive.');
     final ext = format == 'jpeg' ? 'jpg' : format;
-    if (ext != 'png' && ext != 'jpg') {
+    if (ext != 'png' && ext != 'jpg' && ext != 'webp') {
       throw ArgumentError(
-        'PDF page export supports PNG or JPG, not .$targetFormat.',
+        'PDF page export supports PNG, JPG, or WebP, not .$targetFormat.',
+      );
+    }
+    if (ext == 'webp' && !await _hasWebpEncoder()) {
+      throw PdfToolUnavailable(
+        'PDF to WebP needs a working local encoder. Install cwebp (Google '
+        'WebP tools) or ImageMagick with WebP support. Converto never writes '
+        'PNG bytes under a .webp name and never downloads an encoder.',
       );
     }
 
@@ -149,7 +670,10 @@ class PdfEngine {
       outputDir.createSync(recursive: true);
     }
 
-    final doc = await _instance.open(FileSource(sourceFile));
+    final doc = await _instance.open(
+      FileSource(sourceFile),
+      password: password,
+    );
     final base = FileUtils.getBaseNameWithoutExtension(sourceFile.path);
     final results = <File>[];
     final newlyCreated = <File>[];
@@ -201,6 +725,26 @@ class PdfEngine {
               flush: true,
             ),
           );
+        } else if (ext == 'webp') {
+          final tempPng = File('${output.path}.source.png');
+          final encoded = File('${output.path}.encoded.webp');
+          try {
+            await tempPng.writeAsBytes(pageBytes, flush: true);
+            if (!await _encodeWebp(tempPng.path, encoded.path)) {
+              throw PdfToolUnavailable(
+                'Could not encode page ${index + 1} as WebP. Check that cwebp '
+                'or ImageMagick with WebP support is available.',
+              );
+            }
+            // Only replace an existing destination after a valid WebP exists.
+            await StorageService.writeAtomically(
+              output,
+              (temp) => encoded.copy(temp.path),
+            );
+          } finally {
+            if (tempPng.existsSync()) tempPng.deleteSync();
+            if (encoded.existsSync()) encoded.deleteSync();
+          }
         } else {
           await StorageService.writeAtomically(
             output,
@@ -599,36 +1143,37 @@ class PdfEngine {
       var start = 0;
       while (start < total) {
         final remaining = total - start;
-        var probe = 1;
-        var lastFit = 0;
+        // Seed the search with the average bytes per page. Most PDFs have a
+        // fairly even page size, so this lands close to the answer and cuts
+        // the number of trial extractions sharply.
+        final averageBytes = sourceFile.lengthSync() / math.max(total, 1);
+        final estimate = (maxBytes / math.max(averageBytes, 1)).floor().clamp(
+          1,
+          remaining,
+        );
 
-        while (probe <= remaining) {
+        Future<bool> fits(int count) async {
           final counter = _CountingSink();
           await _instance.extractPages(
             FileSource(sourceFile),
             counter,
-            pages: List.generate(probe, (i) => start + i),
+            pages: List.generate(count, (i) => start + i),
           );
-          if (counter.length <= maxBytes) {
-            lastFit = probe;
-            probe *= 2;
-          } else {
-            break;
-          }
+          return counter.length <= maxBytes;
         }
 
-        var low = lastFit > 0 ? lastFit : 1;
-        var high = probe.clamp(1, remaining);
-        var best = lastFit;
+        var low = 1;
+        var high = remaining;
+        var best = 0;
+        if (await fits(estimate)) {
+          best = estimate;
+          low = estimate + 1;
+        } else {
+          high = estimate - 1;
+        }
         while (low <= high) {
           final middle = (low + high) ~/ 2;
-          final counter = _CountingSink();
-          await _instance.extractPages(
-            FileSource(sourceFile),
-            counter,
-            pages: List.generate(middle, (i) => start + i),
-          );
-          if (counter.length <= maxBytes) {
+          if (await fits(middle)) {
             best = middle;
             low = middle + 1;
           } else {
@@ -714,6 +1259,20 @@ class PdfEngine {
     );
     try {
       final first = doc.pages.isEmpty ? null : doc.pages.first;
+      var signatures = <PdfSignatureInfo>[];
+      try {
+        signatures = await doc.signatures;
+      } catch (_) {
+        // Some malformed signature dictionaries should not block inspection.
+      }
+      bool? signaturesValid;
+      if (signatures.isNotEmpty) {
+        try {
+          signaturesValid = await doc.verifySignatures();
+        } catch (_) {
+          signaturesValid = null;
+        }
+      }
       return PdfInfo(
         file: sourceFile,
         pageCount: doc.pageCount,
@@ -726,6 +1285,13 @@ class PdfEngine {
         firstPageWidth: first?.effectiveWidth ?? 0,
         firstPageHeight: first?.effectiveHeight ?? 0,
         rotation: first?.rotation ?? 0,
+        signatureSummaries: [
+          for (final signature in signatures)
+            '${signature.signerName ?? 'Unknown signer'} · '
+                '${signature.isValid ? 'valid' : 'unverified'}'
+                '${signature.signingTime == null ? '' : ' · ${signature.signingTime!.toIso8601String().split('T').first}'}',
+        ],
+        signaturesValid: signaturesValid,
       );
     } finally {
       await doc.dispose();
@@ -914,6 +1480,466 @@ class PdfEngine {
       if (file.existsSync()) file.deleteSync();
     }
   }
+
+  static String _normalizeText(String text) =>
+      text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  static String _describeTextDiff(String left, String right) {
+    final leftWords = left.split(' ').where((word) => word.isNotEmpty).toList();
+    final rightWords = right
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .toList();
+    final diff = _wordDiff(leftWords, rightWords);
+    if (diff.truncated) {
+      return 'text differs (~${leftWords.length} vs ${rightWords.length} words)';
+    }
+
+    final counts = <String>[
+      if (diff.added.isNotEmpty) '+${diff.added.length}',
+      if (diff.removed.isNotEmpty) '-${diff.removed.length}',
+    ];
+    final sample = <String>[
+      for (final word in diff.added.take(4)) '+"$word"',
+      for (final word in diff.removed.take(4)) '-"$word"',
+    ].join(' ');
+    if (counts.isEmpty) return 'text differs';
+    return 'text differs (${counts.join(' ')}'
+        '${sample.isEmpty ? '' : ': $sample'})';
+  }
+
+  static _WordDiff _wordDiff(List<String> left, List<String> right) {
+    const cap = 300;
+    if (left.length > cap || right.length > cap) {
+      return const _WordDiff(truncated: true);
+    }
+
+    final rows = left.length;
+    final columns = right.length;
+    final lengths = List.generate(
+      rows + 1,
+      (_) => List<int>.filled(columns + 1, 0),
+    );
+    for (var i = rows - 1; i >= 0; i--) {
+      for (var j = columns - 1; j >= 0; j--) {
+        lengths[i][j] = left[i].toLowerCase() == right[j].toLowerCase()
+            ? lengths[i + 1][j + 1] + 1
+            : math.max(lengths[i + 1][j], lengths[i][j + 1]);
+      }
+    }
+
+    final added = <String>[];
+    final removed = <String>[];
+    var i = 0;
+    var j = 0;
+    while (i < rows && j < columns) {
+      if (left[i].toLowerCase() == right[j].toLowerCase()) {
+        i++;
+        j++;
+      } else if (lengths[i + 1][j] >= lengths[i][j + 1]) {
+        removed.add(left[i++]);
+      } else {
+        added.add(right[j++]);
+      }
+    }
+    while (i < rows) {
+      removed.add(left[i++]);
+    }
+    while (j < columns) {
+      added.add(right[j++]);
+    }
+
+    return _WordDiff(added: added, removed: removed);
+  }
+
+  static bool _sameBytes(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static Future<Uint8List?> _renderPage(PdfDoc doc, int index, int dpi) async {
+    final info = doc.pages[index];
+    final width = (info.effectiveWidth * dpi / 72).round().clamp(1, 5000);
+    final height = (info.effectiveHeight * dpi / 72).round().clamp(1, 5000);
+    await for (final page in doc.render(
+      pages: PdfPages.single(index),
+      size: PdfRenderSize(maxWidth: width, maxHeight: height),
+    )) {
+      return page.data;
+    }
+    return null;
+  }
+
+  static double _pixelDifference(img.Image left, img.Image right) {
+    if (left.width != right.width || left.height != right.height) return 1;
+    final stepX = math.max(1, left.width ~/ 600);
+    final stepY = math.max(1, left.height ~/ 600);
+    var different = 0;
+    var total = 0;
+    for (var y = 0; y < left.height; y += stepY) {
+      for (var x = 0; x < left.width; x += stepX) {
+        final a = left.getPixel(x, y);
+        final b = right.getPixel(x, y);
+        final delta = (a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs();
+        if (delta > 24) different++;
+        total++;
+      }
+    }
+    return total == 0 ? 0 : different / total;
+  }
+
+  static List<_DiffRect> _diffRegions(img.Image left, img.Image right) {
+    if (left.width != right.width || left.height != right.height) {
+      return [
+        _DiffRect(
+          left: 0,
+          top: 0,
+          right: math.min(left.width, right.width) - 1,
+          bottom: math.min(left.height, right.height) - 1,
+        ),
+      ];
+    }
+
+    final tile = math.max(8, math.min(left.width, left.height) ~/ 32);
+    final columns = (left.width / tile).ceil();
+    final rows = (left.height / tile).ceil();
+    final marked = List.generate(
+      rows,
+      (_) => List<bool>.filled(columns, false),
+    );
+
+    for (var row = 0; row < rows; row++) {
+      for (var column = 0; column < columns; column++) {
+        var changed = 0;
+        var total = 0;
+        for (
+          var y = row * tile;
+          y < math.min((row + 1) * tile, left.height);
+          y++
+        ) {
+          for (
+            var x = column * tile;
+            x < math.min((column + 1) * tile, left.width);
+            x++
+          ) {
+            final a = left.getPixel(x, y);
+            final b = right.getPixel(x, y);
+            final delta =
+                (a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs();
+            if (delta > 24) changed++;
+            total++;
+          }
+        }
+        if (total > 0 && changed / total > 0.01) {
+          marked[row][column] = true;
+        }
+      }
+    }
+
+    final parent = List<int>.generate(rows * columns, (index) => index);
+    int find(int index) {
+      while (parent[index] != index) {
+        parent[index] = parent[parent[index]];
+        index = parent[index];
+      }
+      return index;
+    }
+
+    void union(int a, int b) {
+      final rootA = find(a);
+      final rootB = find(b);
+      if (rootA != rootB) parent[rootB] = rootA;
+    }
+
+    for (var row = 0; row < rows; row++) {
+      for (var column = 0; column < columns; column++) {
+        if (!marked[row][column]) continue;
+        final index = row * columns + column;
+        if (column + 1 < columns && marked[row][column + 1]) {
+          union(index, index + 1);
+        }
+        if (row + 1 < rows && marked[row + 1][column]) {
+          union(index, index + columns);
+        }
+        if (row + 1 < rows &&
+            column + 1 < columns &&
+            marked[row + 1][column + 1]) {
+          union(index, index + columns + 1);
+        }
+      }
+    }
+
+    final bounds = <int, List<int>>{};
+    for (var row = 0; row < rows; row++) {
+      for (var column = 0; column < columns; column++) {
+        if (!marked[row][column]) continue;
+        final root = find(row * columns + column);
+        final current = bounds[root] ?? [row, column, row, column];
+        if (row < current[0]) current[0] = row;
+        if (column < current[1]) current[1] = column;
+        if (row > current[2]) current[2] = row;
+        if (column > current[3]) current[3] = column;
+        bounds[root] = current;
+      }
+    }
+
+    final regions = <_DiffRect>[];
+    for (final bound in bounds.values) {
+      final region = _DiffRect(
+        left: bound[1] * tile,
+        top: bound[0] * tile,
+        right: math.min((bound[3] + 1) * tile, left.width) - 1,
+        bottom: math.min((bound[2] + 1) * tile, left.height) - 1,
+      );
+      if (region.width >= 4 && region.height >= 4) regions.add(region);
+    }
+    regions.sort((a, b) => (b.width * b.height).compareTo(a.width * a.height));
+    if (regions.length <= 40) return regions;
+    return [
+      _DiffRect(
+        left: 0,
+        top: 0,
+        right: left.width - 1,
+        bottom: left.height - 1,
+      ),
+    ];
+  }
+
+  static Uint8List _annotateDiff(
+    Uint8List png,
+    img.Image? image,
+    List<_DiffRect> regions,
+  ) {
+    if (image == null || regions.isEmpty) return png;
+    final copy = image.clone();
+    final marker = img.ColorRgba8(220, 38, 38, 255);
+    for (final region in regions) {
+      img.drawRect(
+        copy,
+        x1: region.left,
+        y1: region.top,
+        x2: region.right,
+        y2: region.bottom,
+        color: marker,
+        thickness: 3,
+      );
+    }
+    return Uint8List.fromList(img.encodePng(copy));
+  }
+
+  static String _buildCompareReport({
+    required File leftFile,
+    required File rightFile,
+    required PdfCompareResult result,
+    required List<_CompareReportPage> pages,
+  }) {
+    final out = StringBuffer();
+    out.writeln('<!DOCTYPE html>');
+    out.writeln('<html lang="en">');
+    out.writeln('<head>');
+    out.writeln('<meta charset="utf-8">');
+    out.writeln(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    );
+    out.writeln('<title>PDF comparison</title>');
+    out.writeln('<style>');
+    out.writeln(
+      'body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;'
+      'background:#f4f4f5;color:#18181b;margin:0;padding:2rem 1rem}',
+    );
+    out.writeln(
+      'main{max-width:1200px;margin:0 auto}h1{font-size:1.6rem;margin:0 0 .4rem}',
+    );
+    out.writeln(
+      '.meta{color:#52525b;font-size:.9rem;word-break:break-word;margin:0 0 1.2rem}',
+    );
+    out.writeln(
+      '.verdict{display:inline-block;padding:.35rem .65rem;border-radius:6px;'
+      'font-weight:600;background:#dcfce7;color:#166534}',
+    );
+    out.writeln('.verdict.changed{background:#fef3c7;color:#92400e}');
+    out.writeln(
+      'ul.details{color:#52525b;font-size:.9rem;line-height:1.5;margin:.8rem 0 1.6rem}',
+    );
+    out.writeln(
+      '.page{background:#fff;border:1px solid #d4d4d8;border-radius:10px;'
+      'padding:1rem;margin:0 0 1.5rem}',
+    );
+    out.writeln('h2{font-size:1rem;margin:0 0 .2rem}');
+    out.writeln('.reason{color:#9a3412;font-size:.85rem;margin:.2rem 0 .8rem}');
+    out.writeln('.pair{display:grid;grid-template-columns:1fr 1fr;gap:1rem}');
+    out.writeln('figure{margin:0}');
+    out.writeln(
+      'figcaption{font-size:.75rem;color:#71717a;margin-bottom:.35rem;'
+      'text-transform:uppercase;letter-spacing:.05em}',
+    );
+    out.writeln(
+      'img{display:block;width:100%;height:auto;border:1px solid #e4e4e7;'
+      'border-radius:4px;background:#fff}',
+    );
+    out.writeln(
+      '.missing{padding:2rem;border:1px dashed #d4d4d8;border-radius:4px;'
+      'color:#71717a;text-align:center}',
+    );
+    out.writeln(
+      '@media(max-width:720px){.pair{grid-template-columns:1fr}body{padding:1rem .5rem}}',
+    );
+    out.writeln('</style>');
+    out.writeln('</head>');
+    out.writeln('<body><main>');
+    out.writeln('<h1>PDF comparison</h1>');
+    out.writeln(
+      '<p class="meta">${_escapeHtml(leftFile.path)} '
+      '(${result.leftPages} pages) &#8596; '
+      '${_escapeHtml(rightFile.path)} (${result.rightPages} pages)</p>',
+    );
+    final verdict = result.identical
+        ? 'Identical on every shared page'
+        : [
+            if (result.changedPages.isNotEmpty)
+              '${result.changedPages.length} changed page${result.changedPages.length == 1 ? '' : 's'}',
+            if (result.leftPages != result.rightPages) 'page count differs',
+          ].join(' · ');
+    out.writeln(
+      '<p class="verdict${result.identical ? '' : ' changed'}">'
+      '${_escapeHtml(verdict)}'
+      '</p>',
+    );
+    if (result.details.isNotEmpty) {
+      out.writeln('<ul class="details">');
+      for (final detail in result.details) {
+        out.writeln('<li>${_escapeHtml(detail)}</li>');
+      }
+      out.writeln('</ul>');
+    }
+    if (pages.isEmpty) {
+      out.writeln(
+        '<p class="details">No changed pages to display. '
+        'The side-by-side view is only generated for changed pages.</p>',
+      );
+    } else {
+      for (final page in pages) {
+        out.writeln('<section class="page">');
+        out.writeln('<h2>Page ${page.page}</h2>');
+        out.writeln('<p class="reason">${_escapeHtml(page.summary)}</p>');
+        out.writeln('<div class="pair">');
+        out.writeln('<figure><figcaption>Left</figcaption>');
+        out.writeln(
+          page.leftPng == null
+              ? '<div class="missing">Page not present</div>'
+              : '<img alt="Left page ${page.page}" src="data:image/png;base64,${base64Encode(page.leftPng!)}">',
+        );
+        out.writeln('</figure>');
+        out.writeln('<figure><figcaption>Right</figcaption>');
+        out.writeln(
+          page.rightPng == null
+              ? '<div class="missing">Page not present</div>'
+              : '<img alt="Right page ${page.page}" src="data:image/png;base64,${base64Encode(page.rightPng!)}">',
+        );
+        out.writeln('</figure>');
+        out.writeln('</div></section>');
+      }
+    }
+    out.writeln('</main></body></html>');
+    return out.toString();
+  }
+
+  static String _escapeHtml(String value) => value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+
+  static Future<String?> _findTesseract() async {
+    if (Platform.environment['CONVERTO_DISABLE_HELPERS'] == '1') return null;
+    try {
+      final probe = await Process.run(Platform.isWindows ? 'where' : 'which', [
+        'tesseract',
+      ]);
+      if (probe.exitCode == 0) {
+        final found = probe.stdout.toString().trim().split('\n').first.trim();
+        if (found.isNotEmpty) return found;
+      }
+    } catch (_) {}
+    try {
+      final direct = await Process.run('tesseract', ['--version']);
+      if (direct.exitCode == 0) return 'tesseract';
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<bool> _hasWebpEncoder() async {
+    if (Platform.environment['CONVERTO_DISABLE_HELPERS'] == '1') return false;
+
+    // An executable being present is not enough: sips --version succeeds on
+    // macOS builds that cannot write WebP at all. Probe with a real 2x2 PNG
+    // and validate the container before promising PDF-to-WebP support.
+    final probe = await Directory.systemTemp.createTemp('converto-webp-probe-');
+    try {
+      final png = File('${probe.path}${Platform.pathSeparator}probe.png');
+      await png.writeAsBytes(
+        img.encodePng(img.Image(width: 2, height: 2)),
+        flush: true,
+      );
+      return await _encodeWebp(
+        png.path,
+        '${probe.path}${Platform.pathSeparator}probe.webp',
+      );
+    } finally {
+      if (probe.existsSync()) await probe.delete(recursive: true);
+    }
+  }
+
+  static Future<bool> _encodeWebp(String pngPath, String webpPath) async {
+    final attempts = <String, List<String>>{
+      'cwebp': ['-quiet', '-q', '90', '-o', webpPath, pngPath],
+      'magick': [pngPath, webpPath],
+    };
+
+    for (final entry in attempts.entries) {
+      try {
+        final result = await Process.run(entry.key, entry.value);
+        if (result.exitCode != 0) continue;
+        final encoded = File(webpPath);
+        if (!encoded.existsSync()) continue;
+        final bytes = await encoded.readAsBytes();
+        if (bytes.length >= 12 &&
+            bytes[0] == 0x52 &&
+            bytes[1] == 0x49 &&
+            bytes[2] == 0x46 &&
+            bytes[3] == 0x46 &&
+            bytes[8] == 0x57 &&
+            bytes[9] == 0x45 &&
+            bytes[10] == 0x42 &&
+            bytes[11] == 0x50) {
+          return true;
+        }
+        if (encoded.existsSync()) encoded.deleteSync();
+      } catch (_) {}
+    }
+    return false;
+  }
+}
+
+/// A local helper (Tesseract or cwebp) is required but unavailable.
+class PdfToolUnavailable implements Exception {
+  const PdfToolUnavailable(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class PdfRasterPage {
+  final Uint8List png;
+  final double width;
+  final double height;
+  final int pageCount;
+  const PdfRasterPage(this.png, this.width, this.height, this.pageCount);
 }
 
 class PdfInfo {
@@ -929,6 +1955,8 @@ class PdfInfo {
     required this.firstPageWidth,
     required this.firstPageHeight,
     required this.rotation,
+    required this.signatureSummaries,
+    required this.signaturesValid,
   });
 
   final File file;
@@ -942,6 +1970,84 @@ class PdfInfo {
   final double firstPageWidth;
   final double firstPageHeight;
   final int rotation;
+  final List<String> signatureSummaries;
+  final bool? signaturesValid;
+}
+
+class _DiffRect {
+  const _DiffRect({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+  });
+
+  final int left;
+  final int top;
+  final int right;
+  final int bottom;
+
+  int get width => right - left + 1;
+  int get height => bottom - top + 1;
+}
+
+class _CompareReportPage {
+  const _CompareReportPage({
+    required this.page,
+    required this.leftPng,
+    required this.rightPng,
+    required this.summary,
+  });
+
+  final int page;
+  final Uint8List? leftPng;
+  final Uint8List? rightPng;
+  final String summary;
+}
+
+class _WordDiff {
+  const _WordDiff({
+    this.added = const [],
+    this.removed = const [],
+    this.truncated = false,
+  });
+
+  final List<String> added;
+  final List<String> removed;
+  final bool truncated;
+}
+
+class PdfCompareResult {
+  const PdfCompareResult({
+    required this.leftPages,
+    required this.rightPages,
+    required this.changedPages,
+    required this.details,
+    this.report,
+  });
+
+  final int leftPages;
+  final int rightPages;
+  final List<int> changedPages;
+  final List<String> details;
+  final File? report;
+
+  bool get identical =>
+      leftPages == rightPages && changedPages.isEmpty && details.isEmpty;
+}
+
+class PdfOcrResult {
+  const PdfOcrResult({
+    required this.textFile,
+    required this.pdfFile,
+    required this.pageCount,
+    required this.characters,
+  });
+
+  final File textFile;
+  final File? pdfFile;
+  final int pageCount;
+  final int characters;
 }
 
 class PdfRedactResult {

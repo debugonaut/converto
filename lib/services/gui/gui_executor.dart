@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../../core/utils/file_utils.dart';
 import '../../models/edit_options.dart';
+import '../../models/scan_options.dart';
 import '../../models/gui/tool_definition.dart';
 import '../file_operations.dart';
 import '../pdf/pdf_engine.dart';
+import '../scanned_pdf_service.dart';
 import 'output_names.dart';
 import 'pdf_page_actions.dart';
 
@@ -24,6 +26,22 @@ class GuiRequest {
     this.outputName,
     this.outputNames = const {},
   });
+
+  bool get combinesImagesToPdf {
+    final definition = ToolDefinition.byId(tool);
+    final extensions = paths.map(FileUtils.getExtension);
+    final target =
+        options['format'] as String? ??
+        definition.targets(extensions).firstOrNull ??
+        '';
+    return options['pdfOutput'] != 'separate' &&
+        definition.canCombineImagesToPdf(extensions, target);
+  }
+
+  bool get hasCombinedOutput =>
+      tool == ToolId.merge ||
+      (tool == ToolId.scanPdf && paths.length > 1) ||
+      combinesImagesToPdf;
 }
 
 class GuiResult {
@@ -82,6 +100,11 @@ class GuiExecutor {
   }) async {
     final clock = Stopwatch()..start();
     final tool = ToolDefinition.byId(request.tool);
+    final combineImages = request.combinesImagesToPdf;
+    final combinedOutput = request.hasCombinedOutput;
+    final combinePages =
+        combineImages ||
+        (request.tool == ToolId.scanPdf && request.paths.length > 1);
     final extension = switch (request.tool) {
       ToolId.pdfText => 'txt',
       ToolId.convert ||
@@ -177,13 +200,25 @@ class GuiExecutor {
             '${base}_${request.tool.name}.${ext ?? 'pdf'}',
           );
           void progress(double v) => onProgress?.call(
-            (index + v.clamp(0, 1) * .95) / request.paths.length,
+            combinePages
+                ? (index + v.clamp(0, 1)) / request.paths.length * .9
+                : (index + v.clamp(0, 1) * .95) / request.paths.length,
             '${index + 1} of ${request.paths.length} · ${p.basename(source.path)}',
           );
           progress(0);
           final firstNewOutput = generated.length;
           try {
             switch (request.tool) {
+              case ToolId.scanPdf:
+                generated.add(
+                  await ScannedPdfService.create(
+                    source: source,
+                    outputPath: destination(),
+                    options: ScanOptions.fromMap(o),
+                    checkpoint: checkpoint,
+                    onProgress: progress,
+                  ),
+                );
               case ToolId.convert:
               case ToolId.editImage:
               case ToolId.pdfText:
@@ -423,6 +458,25 @@ class GuiExecutor {
           }
           await checkpoint();
         }
+        if (combinePages) {
+          final message = combineImages
+              ? 'Combining images'
+              : 'Combining scanned pages';
+          onProgress?.call(.9, message);
+          await checkpoint();
+          final combined = await PdfEngine.merge(
+            files: generated,
+            outputPath: p.join(
+              staging.path,
+              request.tool == ToolId.scanPdf ? 'scanned.pdf' : 'combined.pdf',
+            ),
+            onProgress: (v) => onProgress?.call(.9 + v * .05, message),
+          );
+          generated
+            ..clear()
+            ..add(combined);
+          generatedSources.clear();
+        }
       }
       await checkpoint();
       // No await between the final cancellation check and publication: the
@@ -438,7 +492,7 @@ class GuiExecutor {
       for (final file in generated) {
         final source = generatedSources[file.path] ?? request.paths.first;
         final override = request.outputNames[source];
-        final name = request.tool == ToolId.merge
+        final name = combinedOutput
             ? request.outputName
             : override ?? request.outputName;
         var filename = p.basename(file.path);
@@ -447,7 +501,7 @@ class GuiExecutor {
               override == null &&
               request.outputNames.isEmpty &&
               request.paths.length > 1 &&
-              request.tool != ToolId.merge;
+              !combinedOutput;
           final count = globalBatch ? generated.length : counts[source]!;
           final number = globalBatch
               ? ++globalIndex

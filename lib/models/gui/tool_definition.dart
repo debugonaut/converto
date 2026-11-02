@@ -20,6 +20,7 @@ enum ToolId {
   pdfa,
   unlock,
   info,
+  scanPdf,
 }
 
 enum ToolCategory { all, convert, organize, edit, optimize, security }
@@ -35,7 +36,7 @@ class ToolDefinition {
     final category = FormatRegistry.getFormatInfo(extension).category;
     if (category == FileCategory.unknown) return false;
     return switch (id) {
-      ToolId.convert => true,
+      ToolId.convert || ToolId.scanPdf => true,
       ToolId.merge =>
         category == FileCategory.pdf || category == FileCategory.image,
       ToolId.editImage => category == FileCategory.image,
@@ -56,6 +57,17 @@ class ToolDefinition {
     return (shared ?? {'pdf', 'png', 'jpg', 'txt'}).toList();
   }
 
+  bool canCombineImagesToPdf(Iterable<String> extensions, String target) {
+    final sources = extensions.toList();
+    return id == ToolId.convert &&
+        target == 'pdf' &&
+        sources.length > 1 &&
+        sources.every(
+          (ext) =>
+              FormatRegistry.getFormatInfo(ext).category == FileCategory.image,
+        );
+  }
+
   static const tools = <ToolDefinition>[
     ToolDefinition(
       ToolId.convert,
@@ -68,6 +80,12 @@ class ToolDefinition {
       'Merge PDF',
       'Combine PDFs and images in your order.',
       ToolCategory.organize,
+    ),
+    ToolDefinition(
+      ToolId.scanPdf,
+      'Create scanned PDF',
+      'Adjust contrast and turn files into scanned pages.',
+      ToolCategory.convert,
     ),
     ToolDefinition(
       ToolId.split,

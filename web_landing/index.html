@@ -89,11 +89,14 @@
           </svg>
           <span>Buy Me a Coffee</span>
         </a>
-        <a href="https://github.com/debugonaut/converto" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+        <a href="https://github.com/debugonaut/converto" target="_blank" rel="noopener" class="btn btn-outline btn-sm github-stars" aria-label="View Converto on GitHub, 0 stars" title="Converto on GitHub · 0 stars">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
-          GitHub
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m12 3 2.78 5.63 6.22.91-4.5 4.39 1.06 6.19L12 17.2l-5.56 2.92 1.06-6.19L3 9.54l6.22-.91L12 3z"/>
+          </svg>
+          <span class="github-star-count">0</span>
         </a>
         <button id="themeToggle" class="btn btn-icon btn-sm" aria-label="Toggle theme">
           <svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -109,11 +112,6 @@
     <!-- Hero Section -->
     <section class="hero-section">
       <div class="hero-container">
-        <div class="announcement-pill">
-          <span class="status-dot"></span>
-          <span>Zero network requests. 100% device-side processing.</span>
-        </div>
-
         <h1 class="hero-heading">Offline file converter and editor</h1>
         <p class="hero-lead">
           Convert, merge, split, crop, compress, and watermark your files directly on your computer or mobile device. Free and open source under Apache 2.0.
@@ -124,10 +122,10 @@
           <div class="download-card-body">
             <div class="device-detected-row">
               <span class="device-label" id="deviceLabel">Detected device: macOS</span>
-              <span class="version-label">Release v1.0.0</span>
+              <span class="version-label">Release v1.1.0</span>
             </div>
             <div class="download-cta-group">
-              <a href="#downloads" id="primaryDownloadBtn" class="btn btn-primary btn-lg">
+              <a href="downloads/Converto-macOS-arm64.zip" download="Converto-macOS-arm64.zip" id="primaryDownloadBtn" class="btn btn-primary btn-lg">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/>
@@ -135,7 +133,7 @@
                 </svg>
                 <span id="primaryDownloadText">Download for macOS</span>
               </a>
-              <span class="download-meta" id="downloadMeta">Apple Silicon &amp; Intel &bull; Standalone .dmg</span>
+              <span class="download-meta" id="downloadMeta">Developer preview &bull; 19.55 MiB ZIP &bull; macOS 13.0+</span>
             </div>
           </div>
           <div class="download-card-footer">
@@ -441,11 +439,11 @@
           <div class="download-row" id="downloads-macos" data-os="macos">
             <div class="dl-info">
               <span class="dl-name">macOS</span>
-              <span class="dl-spec">Universal Binary (Apple Silicon M1/M2/M3/M4 &amp; Intel) &bull; macOS 11.0+</span>
+              <span class="dl-spec">Apple Silicon &amp; Intel &bull; macOS 13.0+ &bull; Developer preview</span>
             </div>
             <div class="dl-btn-group">
-              <a href="https://github.com/releases/download/v1.0.0/Converto-macOS-arm64.dmg" class="btn btn-outline btn-sm">Apple Silicon (.dmg)</a>
-              <a href="https://github.com/releases/download/v1.0.0/Converto-macOS-x64.dmg" class="btn btn-outline btn-sm">Intel (.dmg)</a>
+              <a href="downloads/Converto-macOS-arm64.zip" download class="btn btn-outline btn-sm">Apple Silicon (.zip)</a>
+              <a href="downloads/Converto-macOS-x86_64.zip" download class="btn btn-outline btn-sm">Intel (.zip)</a>
             </div>
           </div>
 
@@ -453,11 +451,10 @@
           <div class="download-row" id="downloads-windows" data-os="windows">
             <div class="dl-info">
               <span class="dl-name">Windows</span>
-              <span class="dl-spec">x64 Architecture &bull; Windows 10 &amp; 11</span>
+              <span class="dl-spec">Windows 10 &amp; 11 (x64) &bull; Extract the ZIP, then open Converto.exe</span>
             </div>
             <div class="dl-btn-group">
-              <a href="https://github.com/releases/download/v1.0.0/Converto-Windows-Setup.exe" class="btn btn-outline btn-sm">Installer (.exe)</a>
-              <a href="https://github.com/releases/download/v1.0.0/Converto-Windows-portable.zip" class="btn btn-outline btn-sm">Portable (.zip)</a>
+              <a href="downloads/Converto-Windows-x64.zip" download class="btn btn-outline btn-sm">Portable (.zip)</a>
             </div>
           </div>
 
@@ -465,11 +462,11 @@
           <div class="download-row" id="downloads-linux" data-os="linux">
             <div class="dl-info">
               <span class="dl-name">Linux</span>
-              <span class="dl-spec">x86_64 &bull; Ubuntu, Debian, Fedora, Arch</span>
+              <span class="dl-spec">x86_64 &bull; GTK 3 &bull; Verified on Ubuntu 22.04</span>
             </div>
             <div class="dl-btn-group">
-              <a href="https://github.com/releases/download/v1.0.0/Converto-Linux.AppImage" class="btn btn-outline btn-sm">AppImage</a>
-              <a href="https://github.com/releases/download/v1.0.0/Converto-Linux.deb" class="btn btn-outline btn-sm">Debian (.deb)</a>
+              <a href="downloads/Converto-Linux-x64.tar.gz" download class="btn btn-outline btn-sm">Portable (.tar.gz)</a>
+              <a href="downloads/Converto-Linux-amd64.deb" download class="btn btn-outline btn-sm">Debian (.deb)</a>
             </div>
           </div>
 

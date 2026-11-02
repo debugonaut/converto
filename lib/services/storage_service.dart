@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../core/utils/file_utils.dart';
+import 'app_paths.dart';
 
 class StorageService {
   static final StorageService _instance = StorageService._internal();
@@ -19,6 +20,9 @@ class StorageService {
     if (configured != null && configured.isNotEmpty) {
       return Directory(configured).create(recursive: true);
     }
+
+    final mobile = AppPaths.mobileOutputDirectory;
+    if (mobile != null) return Directory(mobile).create(recursive: true);
 
     final home =
         Platform.environment['HOME'] ??

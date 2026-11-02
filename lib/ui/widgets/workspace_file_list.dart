@@ -5,6 +5,7 @@ import '../../core/utils/file_utils.dart';
 import '../../models/gui/file_preview.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/local_preview_service.dart';
+import '../../services/gui/android_documents.dart';
 import '../../services/gui/output_names.dart';
 import 'file_preview_view.dart';
 import 'output_name_field.dart';
@@ -14,6 +15,7 @@ class WorkspaceFileList extends StatelessWidget {
   final List<String> paths;
   final LocalPreviewService service;
   final bool locked;
+  final bool combinedOutput;
   final int reloadToken;
   final String? activePath;
   final String? failedPath;
@@ -29,6 +31,7 @@ class WorkspaceFileList extends StatelessWidget {
     required this.paths,
     required this.service,
     required this.locked,
+    this.combinedOutput = false,
     this.reloadToken = 0,
     required this.extension,
     required this.onChanged,
@@ -40,7 +43,10 @@ class WorkspaceFileList extends StatelessWidget {
     this.metadata = const {},
   });
   bool get _perFileNames =>
-      paths.length > 1 && tool.id != ToolId.merge && tool.id != ToolId.info;
+      paths.length > 1 &&
+      !combinedOutput &&
+      tool.id != ToolId.merge &&
+      tool.id != ToolId.info;
   void _move(int from, int to) {
     final next = List.of(paths);
     final item = next.removeAt(from);
@@ -98,21 +104,22 @@ class WorkspaceFileList extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    ReorderableDragStartListener(
-                      index: index,
-                      enabled: !locked,
-                      child: const MouseRegion(
-                        cursor: SystemMouseCursors.grab,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 8),
-                          child: Icon(
-                            Icons.drag_indicator,
-                            size: 16,
-                            color: AppTheme.muted,
+                    if (!AndroidDocuments.enabled)
+                      ReorderableDragStartListener(
+                        index: index,
+                        enabled: !locked,
+                        child: const MouseRegion(
+                          cursor: SystemMouseCursors.grab,
+                          child: Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Icon(
+                              Icons.drag_indicator,
+                              size: 16,
+                              color: AppTheme.muted,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     InkWell(
                       onTap: () => onPreview(path),
                       child: SizedBox(
@@ -164,7 +171,7 @@ class WorkspaceFileList extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (paths.length > 1)
+                    if (paths.length > 1 && !AndroidDocuments.enabled)
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -184,16 +191,48 @@ class WorkspaceFileList extends StatelessWidget {
                           ),
                         ],
                       ),
-                    IconButton(
-                      tooltip: 'Remove file',
-                      onPressed: locked
-                          ? null
-                          : () {
-                              final next = List.of(paths)..removeAt(index);
-                              onChanged(next);
-                            },
-                      icon: const Icon(Icons.close, size: 17),
-                    ),
+                    if (AndroidDocuments.enabled)
+                      PopupMenuButton<String>(
+                        tooltip: 'File actions',
+                        enabled: !locked,
+                        onSelected: (action) {
+                          if (action == 'up') {
+                            _move(index, index - 1);
+                          } else if (action == 'down') {
+                            _move(index, index + 1);
+                          } else {
+                            final next = List.of(paths)..removeAt(index);
+                            onChanged(next);
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          if (index > 0)
+                            const PopupMenuItem(
+                              value: 'up',
+                              child: Text('Move up'),
+                            ),
+                          if (index + 1 < paths.length)
+                            const PopupMenuItem(
+                              value: 'down',
+                              child: Text('Move down'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'remove',
+                            child: Text('Remove file'),
+                          ),
+                        ],
+                      )
+                    else
+                      IconButton(
+                        tooltip: 'Remove file',
+                        onPressed: locked
+                            ? null
+                            : () {
+                                final next = List.of(paths)..removeAt(index);
+                                onChanged(next);
+                              },
+                        icon: const Icon(Icons.close, size: 17),
+                      ),
                   ],
                 ),
               ),

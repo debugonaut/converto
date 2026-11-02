@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../constants/app_version.dart';
 import 'command_catalog.dart';
 
 /// Retro Terminal UI inspired by Claude Code and classic phosphor/amber CRT consoles.
@@ -82,7 +83,7 @@ class TerminalUI {
     );
     stdout.writeln();
     stdout.writeln(
-      '  ${style('converto', amber + bold)} ${style('v1.0.0', gray)}'
+      '  ${style('converto', amber + bold)} ${style('v$appVersion', gray)}'
       '  ${style('·', darkGray)}  ${style('${convertoCommands.length} commands', gray)}',
     );
     stdout.writeln(style('  ${'─' * (menuWidth - 4)}', darkGray));
@@ -110,7 +111,7 @@ class TerminalUI {
     stdout.writeln();
 
     printBox(
-      title: 'Converto v1.0.0',
+      title: 'Converto v$appVersion',
       lines: [
         '100% Offline Local File Converter CLI',
         'Air-gapped verified • Zero network requests • Apache 2.0',
