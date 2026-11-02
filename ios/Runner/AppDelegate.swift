@@ -91,12 +91,15 @@ private final class IOSDocuments: NSObject, UIDocumentPickerDelegate,
 
   private func present(_ picker: UIDocumentPickerViewController, purpose: String, result: @escaping FlutterResult) throws {
     guard pending == nil else { throw documentError("Finish or cancel the open document dialog first.") }
-    guard let view = currentPresenter() else { throw documentError("The document picker is not ready. Try again.") }
+    guard let view = currentPresenter(), view.presentedViewController == nil,
+      !view.isBeingPresented, !view.isBeingDismissed else {
+      throw documentError("The document picker is not ready. Try again.")
+    }
     pending = result
     self.purpose = purpose
     picker.delegate = self
-    picker.presentationController?.delegate = self
     view.present(picker, animated: true)
+    picker.presentationController?.delegate = self
   }
 
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { finish(purpose == "import" ? nil : false) }
@@ -127,7 +130,7 @@ private final class IOSDocuments: NSObject, UIDocumentPickerDelegate,
               let folder = batch.appendingPathComponent(String(index), isDirectory: true)
               try manager.createDirectory(at: folder, withIntermediateDirectories: true)
               let name = source.lastPathComponent.unicodeScalars.map {
-                CharacterSet.controlCharacters.contains($0) || $0 == "/" || $0 == "\\" ? "_" : String($0)
+                $0.value < 32 || $0.value == 127 || $0 == "/" || $0 == "\\" ? "_" : String($0)
               }.joined().trimmingCharacters(in: CharacterSet(charactersIn: ". "))
               guard !name.isEmpty else { throw documentError("The file has no usable name.") }
               let destination = folder.appendingPathComponent(name)
