@@ -217,7 +217,17 @@ class FormatRegistry {
           'ico',
         ];
       case FileCategory.pdf:
-        return ['png', 'jpg', 'txt', 'docx', 'xlsx', 'pptx'];
+        return [
+          'png',
+          'jpg',
+          'webp',
+          'txt',
+          'md',
+          'html',
+          'docx',
+          'xlsx',
+          'pptx',
+        ];
       case FileCategory.document:
         return ['pdf', 'txt'];
       case FileCategory.spreadsheet:

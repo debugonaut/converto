@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:converto/main.dart';
+import 'package:converto/ui/screens/tool_workspace.dart';
 import 'package:converto/ui/widgets/output_name_field.dart';
 import 'package:converto/ui/widgets/workspace_file_list.dart';
 
@@ -53,6 +54,8 @@ void main() {
       ..createSync(recursive: true);
     final pdfPath = p.absolute('${root.path}/Project notes.pdf');
     final imagePath = p.absolute('${root.path}/Colour sample.png');
+    final jpegPath = p.absolute('${root.path}/First photo.jpg');
+    final secondJpegPath = p.absolute('${root.path}/Second photo.jpeg');
     await tester.runAsync(() async {
       final document = pw.Document();
       for (var i = 1; i <= 3; i++) {
@@ -129,6 +132,10 @@ void main() {
         color: img.ColorRgb8(246, 239, 223),
       );
       await File(imagePath).writeAsBytes(img.encodePng(image));
+      await File(jpegPath).writeAsBytes(img.encodeJpg(image));
+      await File(
+        secondJpegPath,
+      ).writeAsBytes(img.encodeJpg(img.copyRotate(image, angle: 90)));
     });
     final boundary = GlobalKey();
     Future<void> settle([int n = 12]) async {
@@ -136,7 +143,9 @@ void main() {
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 60)),
         );
-        await tester.pumpAndSettle();
+        // A live worker can keep a progress indicator animating. Advance
+        // frames without waiting for it to settle in the test's fake clock.
+        await tester.pump(const Duration(milliseconds: 100));
       }
     }
 
@@ -188,6 +197,54 @@ void main() {
       );
     }
 
+    await scene('Convert files', [jpegPath, secondJpegPath, imagePath]);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(OutputNameField),
+        matching: find.byType(TextField),
+      ),
+      'Photo collection',
+    );
+    await tester.pumpAndSettle();
+    await save('images-to-pdf-desktop');
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('One combined PDF').first);
+    await settle(3);
+    await save('images-to-pdf-phone');
+    tester.view.physicalSize = const Size(1180, 840);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const Key('run-tool')));
+    });
+    await settle(25);
+    expect(find.text('1 file ready'), findsOneWidget);
+    expect(find.text('Photo collection.pdf'), findsOneWidget);
+    await save('images-to-pdf-result');
+    await scene('Create scanned PDF', [pdfPath, jpegPath]);
+    await tester.pumpAndSettle();
+    await save('scanned-pdf-desktop');
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Contrast'));
+    await settle(5);
+    await save('scanned-pdf-phone');
+    tester.view.physicalSize = const Size(1180, 840);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const Key('run-tool')));
+      final job = tester.widget<ToolWorkspace>(find.byType(ToolWorkspace)).job;
+      final waiting = Stopwatch()..start();
+      while (job.busy && waiting.elapsed < const Duration(seconds: 30)) {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }
+      expect(job.busy, isFalse);
+      expect(job.error, isNull);
+    });
+    await settle(5);
+    expect(find.text('1 file ready'), findsOneWidget);
+    expect(find.text('scanned.pdf'), findsOneWidget);
+    await save('scanned-pdf-result');
     await scene('Merge PDF', [pdfPath, imagePath]);
     await tester.enterText(
       find.descendant(

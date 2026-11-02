@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/file_intake.dart';
+import '../../services/gui/android_documents.dart';
 import '../../services/gui/desktop_file_picker.dart';
 import '../../services/gui/gui_job_controller.dart';
 import '../../services/gui/gui_preferences.dart';
@@ -36,6 +37,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   ToolCategory _category = ToolCategory.all;
   bool _recent = false;
   bool _dragging = false;
+  bool _documentBusy = false;
+  bool get _android => AndroidDocuments.enabled;
   int _pendingIntakes = 0;
   int _intakeRevision = 0;
   String _query = '';
@@ -73,6 +76,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
     super.dispose();
   }
 
+  String _errorText(Object error) =>
+      error is PlatformException ? error.message ?? error.code : '$error';
+
   void _notice(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -105,14 +111,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Future<void> _pick() async {
-    if (_job.busy) return;
+    if (_job.busy || _pendingIntakes > 0) return;
+    setState(() => _pendingIntakes++);
     try {
       final paths = await DesktopFilePicker.pickFiles(
         extensions: FormatRegistry.allSupportedExtensions,
       );
       if (paths != null) await _intake(paths);
     } catch (e) {
-      _notice('Could not choose files: $e');
+      _notice('Could not choose files: ${_errorText(e)}');
+    } finally {
+      if (mounted) setState(() => _pendingIntakes--);
     }
   }
 
@@ -128,18 +137,31 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Future<void> _open(String path, {bool reveal = false}) async {
+    if (_documentBusy) return;
+    _documentBusy = true;
     try {
       if (!File(path).existsSync() && !Directory(path).existsSync()) {
         _notice('This file has been moved or deleted.');
         return;
       }
-      if (reveal) {
+      if (_android) {
+        if (reveal) {
+          if (await AndroidDocuments.exportFile(path))
+            _notice('Copy exported.');
+        } else {
+          await AndroidDocuments.openFile(path);
+        }
+      } else if (reveal) {
         await FileUtils.revealInFileManager(path);
       } else {
         await FileUtils.openFile(path);
       }
     } catch (e) {
-      _notice('Could not open this file: $e');
+      _notice(
+        'Could not ${reveal && _android ? 'export' : 'open'} this file: ${_errorText(e)}',
+      );
+    } finally {
+      _documentBusy = false;
     }
   }
 
@@ -154,67 +176,81 @@ class _HomeDashboardState extends State<HomeDashboard> {
           title: const Text('Settings'),
           content: SizedBox(
             width: 480,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Output folder',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                  _preferences.outputDirectory ?? 'Loading…',
-                  style: const TextStyle(color: AppTheme.muted),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    await _chooseOutput();
-                    update(() {});
-                  },
-                  child: const Text('Choose folder'),
-                ),
-                const Divider(),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Remember recent results'),
-                  subtitle: const Text(
-                    'File names and paths are saved only on this device.',
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_android)
+                    const Text(
+                      'Results are saved privately in this app. Use Export on a completed result to save a copy to your chosen folder. Uninstalling removes private results.',
+                    ),
+                  if (!_android) ...[
+                    const Text(
+                      'Output folder',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      _preferences.outputDirectory ?? 'Loading…',
+                      style: const TextStyle(color: AppTheme.muted),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await _chooseOutput();
+                        update(() {});
+                      },
+                      child: const Text('Choose folder'),
+                    ),
+                  ],
+                  const Divider(),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Remember recent results'),
+                    subtitle: const Text(
+                      'File names and paths are saved only on this device.',
+                    ),
+                    value: _preferences.rememberHistory,
+                    onChanged: (value) async {
+                      update(() => _preferences.rememberHistory = value);
+                      await _preferences.save();
+                    },
                   ),
-                  value: _preferences.rememberHistory,
-                  onChanged: (value) async {
-                    update(() => _preferences.rememberHistory = value);
-                    await _preferences.save();
-                  },
-                ),
-                TextButton(
-                  onPressed: () async {
-                    await HistoryService().clearHistory();
-                    _refresh();
-                    _notice('Local history cleared. Your files are unchanged.');
-                  },
-                  child: const Text('Clear local history'),
-                ),
-                const Divider(),
-                const SizedBox(height: 18),
-                const Text(
-                  'Local engines',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                const Text('PDF & image processing: built in'),
-                Text(
-                  'LibreOffice: ${capabilities.hasLibreOfficeCLI ? 'available' : 'not installed (optional)'}',
-                ),
-                Text(
-                  'WebP encoder: ${webp != null ? 'available' : 'not installed (optional)'}',
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Optional helpers are never downloaded automatically. Some Office inputs and WebP output need a local helper.',
-                  style: TextStyle(color: AppTheme.muted, fontSize: 12),
-                ),
-              ],
+                  TextButton(
+                    onPressed: () async {
+                      await HistoryService().clearHistory();
+                      _refresh();
+                      _notice(
+                        'Local history cleared. Your files are unchanged.',
+                      );
+                    },
+                    child: const Text('Clear local history'),
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Local engines',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('PDF & image processing: built in'),
+                  if (!_android)
+                    Text(
+                      'LibreOffice: ${capabilities.hasLibreOfficeCLI ? 'available' : 'not installed (optional)'}',
+                    ),
+                  if (!_android)
+                    Text(
+                      'WebP encoder: ${webp != null ? 'available' : 'not installed (optional)'}',
+                    ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _android
+                        ? 'Desktop helpers (LibreOffice, WebP encoding and OCR) are unavailable on Android. Tools that require them report an explicit error.'
+                        : 'Optional helpers are never downloaded automatically. Some Office inputs and WebP output need a local helper.',
+                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -279,198 +315,312 @@ class _HomeDashboardState extends State<HomeDashboard> {
               extensions.every(tool.accepts),
         )
         .toList();
-    return CallbackShortcuts(
-      bindings: {
-        SingleActivator(
-          LogicalKeyboardKey.keyO,
-          meta: Platform.isMacOS,
-          control: !Platform.isMacOS,
-        ): _pick,
-        SingleActivator(
-          LogicalKeyboardKey.keyF,
-          meta: Platform.isMacOS,
-          control: !Platform.isMacOS,
-        ): () {
-          if (_tool == null) _searchFocus.requestFocus();
-        },
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (!_job.busy) setState(() => _tool = null);
-        },
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    return PopScope(
+      canPop: _tool == null && !_recent && !_job.busy && _pendingIntakes == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_job.busy || _pendingIntakes > 0) {
+          _notice(
+            'Wait for the current operation or cancel it before leaving.',
+          );
+        } else {
+          setState(() {
+            _tool = null;
+            _recent = false;
+          });
+        }
       },
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.description_outlined, size: 26),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Converto',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -.6,
-                        ),
+      child: CallbackShortcuts(
+        bindings: {
+          SingleActivator(
+            LogicalKeyboardKey.keyO,
+            meta: Platform.isMacOS,
+            control: !Platform.isMacOS,
+          ): _pick,
+          SingleActivator(
+            LogicalKeyboardKey.keyF,
+            meta: Platform.isMacOS,
+            control: !Platform.isMacOS,
+          ): () {
+            if (_tool == null) _searchFocus.requestFocus();
+          },
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (!_job.busy) setState(() => _tool = null);
+          },
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            body: SafeArea(
+              child: Column(
+                children: [
+                  if (compact)
+                    _compactHeader()
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 30,
+                        vertical: 15,
                       ),
-                      const SizedBox(width: 40),
-                      _nav(
-                        'Tools',
-                        !_recent,
-                        () => setState(() {
-                          _recent = false;
-                          _tool = null;
-                        }),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.description_outlined, size: 26),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Converto',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -.6,
+                            ),
+                          ),
+                          const SizedBox(width: 40),
+                          _nav(
+                            'Tools',
+                            !_recent,
+                            () => setState(() {
+                              _recent = false;
+                              _tool = null;
+                            }),
+                          ),
+                          const SizedBox(width: 12),
+                          _nav(
+                            'Recent',
+                            _recent,
+                            () => setState(() {
+                              _recent = true;
+                              _tool = null;
+                            }),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.circle,
+                            size: 7,
+                            color: AppTheme.teal,
+                          ),
+                          const SizedBox(width: 7),
+                          const Text(
+                            'Offline',
+                            style: TextStyle(
+                              color: AppTheme.teal,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          IconButton(
+                            tooltip: 'Settings',
+                            onPressed: _job.busy ? null : _settings,
+                            icon: const Icon(Icons.settings_outlined, size: 20),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      _nav(
-                        'Recent',
-                        _recent,
-                        () => setState(() {
-                          _recent = true;
-                          _tool = null;
-                        }),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.circle, size: 7, color: AppTheme.teal),
-                      const SizedBox(width: 7),
-                      const Text(
-                        'Offline',
-                        style: TextStyle(color: AppTheme.teal, fontSize: 12),
-                      ),
-                      const SizedBox(width: 18),
-                      IconButton(
-                        tooltip: 'Settings',
-                        onPressed: _job.busy ? null : _settings,
-                        icon: const Icon(Icons.settings_outlined, size: 20),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                Expanded(
-                  child: DropTarget(
-                    enable: !_job.busy,
-                    onDragEntered: (_) => setState(() => _dragging = true),
-                    onDragExited: (_) => setState(() => _dragging = false),
-                    onDragDone: (details) {
-                      setState(() => _dragging = false);
-                      _intake(details.files.map((file) => file.path));
-                    },
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: _recent
-                              ? _recentView()
-                              : _tool == null
-                              ? _hub(tools)
-                              : ToolWorkspace(
-                                  key: ValueKey(_tool!.id),
-                                  tool: _tool!,
-                                  paths: _paths,
-                                  job: _job,
-                                  outputDirectory: _preferences.outputDirectory,
-                                  remember: _preferences.rememberHistory,
-                                  addingFiles: _pendingIntakes > 0,
-                                  previews: _previews,
-                                  intakeRevision: _intakeRevision,
-                                  onUseResults: (tool, paths) {
-                                    _job.reset();
-                                    setState(() {
-                                      _paths = List.of(paths);
-                                      _tool = tool;
-                                      _recent = false;
-                                    });
-                                  },
-                                  onBack: () => setState(() => _tool = null),
-                                  onPick: _pick,
-                                  onChooseOutput: _chooseOutput,
-                                  onPathsChanged: (paths) =>
-                                      setState(() => _paths = paths),
-                                  onOpen: _open,
-                                ),
-                        ),
-                        if (_dragging)
+                    ),
+                  const Divider(),
+                  Expanded(
+                    child: _dropTarget(
+                      child: Stack(
+                        children: [
                           Positioned.fill(
-                            child: IgnorePointer(
-                              child: Container(
-                                margin: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.background.withValues(
-                                    alpha: .96,
+                            child: _recent
+                                ? _recentView()
+                                : _tool == null
+                                ? _hub(tools)
+                                : ToolWorkspace(
+                                    key: ValueKey(_tool!.id),
+                                    tool: _tool!,
+                                    paths: _paths,
+                                    job: _job,
+                                    outputDirectory:
+                                        _preferences.outputDirectory,
+                                    remember: _preferences.rememberHistory,
+                                    addingFiles: _pendingIntakes > 0,
+                                    previews: _previews,
+                                    intakeRevision: _intakeRevision,
+                                    onUseResults: (tool, paths) {
+                                      _job.reset();
+                                      setState(() {
+                                        _paths = List.of(paths);
+                                        _tool = tool;
+                                        _recent = false;
+                                      });
+                                    },
+                                    onBack: () => setState(() => _tool = null),
+                                    onPick: _pick,
+                                    onChooseOutput: _chooseOutput,
+                                    onPathsChanged: (paths) =>
+                                        setState(() => _paths = paths),
+                                    onOpen: _open,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: AppTheme.amber,
-                                    width: 2,
+                          ),
+                          if (_dragging)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: Container(
+                                  margin: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.background.withValues(
+                                      alpha: .96,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.amber,
+                                      width: 2,
+                                    ),
                                   ),
-                                ),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.file_download_outlined,
-                                        size: 40,
-                                        color: AppTheme.amber,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'Drop files to add them',
-                                        style: TextStyle(fontSize: 22),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        'Choose a tool when you’re ready.',
-                                        style: TextStyle(color: AppTheme.muted),
-                                      ),
-                                    ],
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.file_download_outlined,
+                                          size: 40,
+                                          color: AppTheme.amber,
+                                        ),
+                                        SizedBox(height: 16),
+                                        Text(
+                                          'Drop files to add them',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Choose a tool when you’re ready.',
+                                          style: TextStyle(
+                                            color: AppTheme.muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Files stay on this device.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: _cli,
-                        child: const Text(
-                          'Use CLI',
-                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                  if (_android && compact && _tool == null)
+                    NavigationBar(
+                      selectedIndex: _recent ? 1 : 0,
+                      onDestinationSelected: _job.busy || _pendingIntakes > 0
+                          ? null
+                          : (index) => setState(() {
+                              _recent = index == 1;
+                              _tool = null;
+                            }),
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.grid_view_outlined),
+                          label: 'Tools',
                         ),
+                        NavigationDestination(
+                          icon: Icon(Icons.history),
+                          label: 'Recent',
+                        ),
+                      ],
+                    ),
+                  if (!compact || !_android) const Divider(),
+                  if (!compact || !_android)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 30,
+                        vertical: 10,
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Files stay on this device.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (!_android)
+                            TextButton(
+                              onPressed: _cli,
+                              child: const Text(
+                                'Use CLI',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.muted,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _compactHeader() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.description_outlined, size: 24),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Converto',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const Text(
+              'Offline',
+              style: TextStyle(color: AppTheme.teal, fontSize: 12),
+            ),
+            IconButton(
+              tooltip: 'Settings',
+              onPressed: _job.busy || _pendingIntakes > 0 ? null : _settings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ],
+        ),
+        if (!_android)
+          Row(
+            children: [
+              _nav(
+                'Tools',
+                !_recent,
+                () => setState(() {
+                  _recent = false;
+                  _tool = null;
+                }),
+              ),
+              _nav(
+                'Recent',
+                _recent,
+                () => setState(() {
+                  _recent = true;
+                  _tool = null;
+                }),
+              ),
+            ],
+          ),
+      ],
+    ),
+  );
+
+  Widget _dropTarget({required Widget child}) => _android
+      ? child
+      : DropTarget(
+          enable: !_job.busy,
+          onDragEntered: (_) => setState(() => _dragging = true),
+          onDragExited: (_) => setState(() => _dragging = false),
+          onDragDone: (details) {
+            setState(() => _dragging = false);
+            _intake(details.files.map((file) => file.path));
+          },
+          child: child,
+        );
 
   Widget _nav(String label, bool selected, VoidCallback action) => TextButton(
     onPressed: _job.busy || _pendingIntakes > 0 ? null : action,
@@ -484,9 +634,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
       final compact = constraints.maxWidth < 900;
       return SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-          compact ? 28 : 52,
+          constraints.maxWidth < 600
+              ? 16
+              : compact
+              ? 28
+              : 52,
           30,
-          compact ? 28 : 52,
+          constraints.maxWidth < 600
+              ? 16
+              : compact
+              ? 28
+              : 52,
           36,
         ),
         child: Align(
@@ -543,7 +701,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       Expanded(
                         child: Text(
                           _paths.isEmpty
-                              ? 'Drop files to see compatible tools'
+                              ? (_android
+                                    ? 'Choose files to see compatible tools'
+                                    : 'Drop files to see compatible tools')
                               : '${_paths.length} files selected · showing compatible tools',
                         ),
                       ),
@@ -578,7 +738,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           ),
                           selected: _category == category,
                           labelStyle: TextStyle(
-                            fontFamily: '.AppleSystemUIFont',
                             color: _category == category
                                 ? AppTheme.amber
                                 : AppTheme.muted,
@@ -635,7 +794,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           .map(
                             (tool) => SizedBox(
                               width: width,
-                              height: 136,
+                              height:
+                                  158 +
+                                  (MediaQuery.textScalerOf(context).scale(14) -
+                                              14)
+                                          .clamp(0, 60) *
+                                      4,
                               child: Material(
                                 color: AppTheme.surface,
                                 shape: RoundedRectangleBorder(
@@ -717,7 +881,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _recentView() {
     final history = HistoryService().getHistory();
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 36),
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 52,
+        vertical: 28,
+      ),
       children: [
         Text(
           'Recent results',
@@ -743,19 +910,27 @@ class _HomeDashboardState extends State<HomeDashboard> {
               Icons.description_outlined,
               color: AppTheme.muted,
             ),
-            title: Text(p.basename(item.targetPath)),
+            title: Text(
+              p.basename(item.targetPath),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             subtitle: Text(
               '${item.targetFormat.toUpperCase()} · ${FileUtils.formatBytes(item.fileSizeBytes)} · ${item.timestamp.toLocal().toString().substring(0, 16)}',
             ),
             onTap: () => _open(item.targetPath),
             trailing: IconButton(
-              tooltip: Platform.isWindows
+              tooltip: _android
+                  ? 'Export result'
+                  : Platform.isWindows
                   ? 'Show in Explorer'
                   : Platform.isMacOS
                   ? 'Show in Finder'
                   : 'Show in file manager',
               onPressed: () => _open(item.targetPath, reveal: true),
-              icon: const Icon(Icons.folder_open_outlined),
+              icon: Icon(
+                _android ? Icons.save_alt : Icons.folder_open_outlined,
+              ),
             ),
           ),
       ],

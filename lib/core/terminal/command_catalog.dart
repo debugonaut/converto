@@ -49,8 +49,22 @@ const List<SlashCommandItem> convertoCommands = [
   ),
   SlashCommandItem(
     command: '/pdf2text',
+    args: '<pdf> [fmt]',
+    desc: 'Extract TXT, Markdown, or HTML',
+    requiresArgs: true,
+    group: CommandGroup.convert,
+  ),
+  SlashCommandItem(
+    command: '/pdf2html',
     args: '<pdf>',
-    desc: 'Extract text from a PDF',
+    desc: 'Convert a PDF to styled HTML',
+    requiresArgs: true,
+    group: CommandGroup.convert,
+  ),
+  SlashCommandItem(
+    command: '/ocr',
+    args: '<pdf> [lang]',
+    desc: 'OCR scans with local Tesseract',
     requiresArgs: true,
     group: CommandGroup.convert,
   ),
@@ -95,6 +109,13 @@ const List<SlashCommandItem> convertoCommands = [
     command: '/rotate',
     args: '<pdf> [degrees]',
     desc: 'Rotate every page',
+    requiresArgs: true,
+    group: CommandGroup.organize,
+  ),
+  SlashCommandItem(
+    command: '/compare',
+    args: '<pdf> <pdf>',
+    desc: 'Compare two PDFs page by page',
     requiresArgs: true,
     group: CommandGroup.organize,
   ),
@@ -149,6 +170,13 @@ const List<SlashCommandItem> convertoCommands = [
     requiresArgs: true,
     group: CommandGroup.edit,
   ),
+  SlashCommandItem(
+    command: '/repair',
+    args: '<pdf> [--sanitize]',
+    desc: 'Rebuild a damaged PDF',
+    requiresArgs: true,
+    group: CommandGroup.edit,
+  ),
 
   // SECURITY
   SlashCommandItem(
@@ -162,6 +190,13 @@ const List<SlashCommandItem> convertoCommands = [
     command: '/unlock',
     args: '<pdf>',
     desc: 'Remove a known PDF password',
+    requiresArgs: true,
+    group: CommandGroup.security,
+  ),
+  SlashCommandItem(
+    command: '/sign',
+    args: '<pdf>',
+    desc: 'Sign with a local certificate',
     requiresArgs: true,
     group: CommandGroup.security,
   ),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:converto/models/gui/tool_definition.dart';
+import 'package:converto/core/constants/format_types.dart';
 import 'package:converto/services/gui/file_intake.dart';
 
 void main() {
@@ -61,13 +62,20 @@ void main() {
     },
   );
   test(
-    'all 19 file tools are real and category and mixed-file routing is honest',
+    'all file tools are real and category and mixed-file routing is honest',
     () {
-      expect(ToolDefinition.tools.length, 19);
-      expect(ToolDefinition.tools.map((tool) => tool.id).toSet().length, 19);
+      expect(ToolDefinition.tools.length, ToolId.values.length);
+      expect(
+        ToolDefinition.tools.map((tool) => tool.id).toSet(),
+        ToolId.values.toSet(),
+      );
       expect(ToolDefinition.byId(ToolId.merge).accepts('png'), isTrue);
       expect(ToolDefinition.byId(ToolId.merge).accepts('docx'), isFalse);
       expect(ToolDefinition.byId(ToolId.editImage).accepts('pdf'), isFalse);
+      final scan = ToolDefinition.byId(ToolId.scanPdf);
+      expect(FormatRegistry.allSupportedExtensions.every(scan.accepts), isTrue);
+      expect(scan.accepts('exe'), isFalse);
+      expect(scan.targets(['pdf', 'jpg', 'docx']), ['pdf']);
       expect(ToolDefinition.byId(ToolId.convert).targets(['png', 'docx']), [
         'pdf',
       ]);

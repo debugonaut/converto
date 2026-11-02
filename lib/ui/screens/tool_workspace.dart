@@ -4,8 +4,10 @@ import 'package:path/path.dart' as p;
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/edit_options.dart';
+import '../../models/scan_options.dart';
 import '../../models/gui/file_preview.dart';
 import '../../services/gui/local_preview_service.dart';
+import '../../services/gui/android_documents.dart';
 import '../../services/gui/output_names.dart';
 import '../../services/gui/workspace_validation.dart';
 import '../widgets/file_preview_view.dart';
@@ -15,6 +17,7 @@ import '../widgets/workspace_results.dart';
 import '../widgets/pdf_page_controls.dart';
 import '../widgets/crop_overlay.dart';
 import '../widgets/image_edit_preview.dart';
+import '../widgets/scan_preview.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/gui_executor.dart';
 import '../../services/gui/gui_job_controller.dart';
@@ -60,11 +63,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   final _values = <String, Object>{};
   final _fields = <String, TextEditingController>{};
   bool _advancedCrop = false;
+  bool _showScanOriginal = false;
   late final LocalPreviewService _previews;
   final _names = <String, TextEditingController>{};
   final _metadata = <String, FilePreview>{};
   final _touched = <String>{};
-  final _mergeName = TextEditingController(text: 'merged');
+  late final TextEditingController _combinedName;
   final _scroll = ScrollController();
   String? _activePath;
   bool _resetting = false;
@@ -76,7 +80,13 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     super.initState();
     _previews = widget.previews ?? LocalPreviewService();
     _activePath = widget.paths.firstOrNull;
-    _mergeName.addListener(_formChanged);
+    _combinedName = TextEditingController(
+      text: _id == ToolId.merge
+          ? 'merged'
+          : _id == ToolId.scanPdf
+          ? 'scanned'
+          : 'combined',
+    )..addListener(_formChanged);
     widget.job.addListener(_jobChanged);
   }
 
@@ -104,6 +114,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     final suffix = switch (_id) {
       ToolId.convert || ToolId.pdfOffice => 'converted',
       ToolId.editImage => 'edited',
+      ToolId.scanPdf => 'scanned',
       ToolId.pdfText => 'text',
       ToolId.extract => 'extracted',
       ToolId.organize => 'organized',
@@ -153,8 +164,8 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   );
   bool get _namesValid =>
       _id == ToolId.info ||
-      (_id == ToolId.merge
-          ? OutputNames.fieldError(_mergeName.text, _extension) == null
+      (_combinedOutput
+          ? OutputNames.fieldError(_combinedName.text, _extension) == null
           : widget.paths.every(
               (path) =>
                   OutputNames.fieldError(_name(path).text, _extension) == null,
@@ -199,6 +210,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     _values.clear();
     _touched.clear();
     _advancedCrop = false;
+    _showScanOriginal = false;
     _resetting = false;
     final meta = _metadata[_activePath];
     if (_id == ToolId.organize && meta?.kind == 'pdf')
@@ -212,6 +224,17 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   ToolId get _id => widget.tool.id;
   bool get _busy => widget.job.busy;
   bool get _filesLocked => _busy || widget.addingFiles;
+  bool get _canCombineImagesToPdf => widget.tool.canCombineImagesToPdf(
+    widget.paths.map(FileUtils.getExtension),
+    _format,
+  );
+  bool get _combineImages =>
+      _canCombineImagesToPdf && _values['pdfOutput'] != 'separate';
+  bool get _combinedOutput =>
+      _id == ToolId.merge ||
+      _combineImages ||
+      (_id == ToolId.scanPdf && widget.paths.length > 1);
+
   List<String> get _targets =>
       widget.tool.targets(widget.paths.map(FileUtils.getExtension));
   String get _format {
@@ -253,7 +276,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     for (final controller in _names.values) {
       controller.dispose();
     }
-    _mergeName.dispose();
+    _combinedName.dispose();
     _scroll.dispose();
     widget.job.removeListener(_jobChanged);
     if (widget.previews == null) _previews.dispose();
@@ -350,13 +373,13 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         options: options,
         outputName: _id == ToolId.info
             ? null
-            : _id == ToolId.merge
-            ? _mergeName.text
+            : _combinedOutput
+            ? _combinedName.text
             : widget.paths.length == 1
             ? _name(widget.paths.single).text
             : null,
         outputNames:
-            _id == ToolId.merge || _id == ToolId.info || widget.paths.length < 2
+            _combinedOutput || _id == ToolId.info || widget.paths.length < 2
             ? const {}
             : {for (final path in widget.paths) path: _name(path).text},
       ),
@@ -400,7 +423,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         Expanded(
           child: SingleChildScrollView(
             controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(32, 20, 32, 28),
+            padding: EdgeInsets.fromLTRB(
+              MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+              20,
+              MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+              28,
+            ),
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
@@ -408,14 +436,14 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
                       children: [
                         TextButton.icon(
                           onPressed: _busy ? null : widget.onBack,
                           icon: const Icon(Icons.arrow_back, size: 17),
                           label: const Text('All tools'),
                         ),
-                        const Spacer(),
                         TextButton.icon(
                           onPressed: _busy ? null : _resetOptions,
                           icon: const Icon(Icons.restart_alt, size: 17),
@@ -469,7 +497,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                                       ),
                                     ),
                                   if (widget.paths.length > 1 &&
-                                      _id != ToolId.merge)
+                                      !_combinedOutput)
                                     const Padding(
                                       padding: EdgeInsets.only(top: 18),
                                       child: Text(
@@ -564,7 +592,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   }
 
   Widget _exportBar(bool valid) => Container(
-    padding: const EdgeInsets.fromLTRB(28, 13, 28, 12),
+    padding: EdgeInsets.fromLTRB(
+      MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
+      13,
+      MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
+      12,
+    ),
     decoration: const BoxDecoration(
       color: AppTheme.background,
       border: Border(top: BorderSide(color: AppTheme.border)),
@@ -573,10 +606,10 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_id != ToolId.info &&
-            (_id == ToolId.merge || widget.paths.length == 1)) ...[
+            (_combinedOutput || widget.paths.length == 1)) ...[
           OutputNameField(
-            controller: _id == ToolId.merge
-                ? _mergeName
+            controller: _combinedOutput
+                ? _combinedName
                 : _name(widget.paths.single),
             extension: _extension,
             enabled: !_filesLocked,
@@ -613,29 +646,41 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
 
   Widget _actionControls(bool valid) => LayoutBuilder(
     builder: (context, box) {
-      Widget folder() => Row(
-        children: [
-          const Icon(Icons.folder_outlined, size: 17, color: AppTheme.muted),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Tooltip(
-              message: widget.outputDirectory ?? '',
-              child: Text(
-                widget.outputDirectory == null
-                    ? 'Loading output folder…'
-                    : p.basename(widget.outputDirectory!),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppTheme.muted),
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: _busy ? null : widget.onChooseOutput,
-            child: const Text('Change folder'),
-          ),
-        ],
-      );
+      Widget folder() => AndroidDocuments.enabled
+          ? const Text(
+              'Saved in this app · export a copy after processing',
+              style: TextStyle(fontSize: 12, color: AppTheme.muted),
+            )
+          : Row(
+              children: [
+                const Icon(
+                  Icons.folder_outlined,
+                  size: 17,
+                  color: AppTheme.muted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Tooltip(
+                    message: widget.outputDirectory ?? '',
+                    child: Text(
+                      widget.outputDirectory == null
+                          ? 'Loading output folder…'
+                          : p.basename(widget.outputDirectory!),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.muted,
+                      ),
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : widget.onChooseOutput,
+                  child: const Text('Change folder'),
+                ),
+              ],
+            );
       Widget button() => FilledButton.icon(
         key: const Key('run-tool'),
         onPressed: valid && !_busy ? _run : null,
@@ -690,13 +735,15 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
           children: [
             Text(
               'Files${widget.paths.isEmpty ? '' : ' · ${widget.paths.length}'}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            const Spacer(),
             if (widget.paths.isNotEmpty)
               TextButton(
                 onPressed: _filesLocked
@@ -721,16 +768,20 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
             ),
             child: InkWell(
               onTap: _filesLocked ? null : widget.onPick,
-              child: const Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.file_download_outlined,
                     color: AppTheme.muted,
                     size: 30,
                   ),
                   SizedBox(height: 14),
-                  Text('Drop files here or choose files'),
+                  Text(
+                    AndroidDocuments.enabled
+                        ? 'Tap to choose files'
+                        : 'Drop files here or choose files',
+                  ),
                   SizedBox(height: 6),
                   Text(
                     'Nothing is saved until you run the tool.',
@@ -748,6 +799,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
             metadata: _metadata,
             reloadToken: _reloadToken,
             locked: _filesLocked,
+            combinedOutput: _combinedOutput,
             extension: _extension,
             activePath: active,
             failedPath: widget.job.failedSource,
@@ -764,11 +816,13 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        if (_id == ToolId.merge)
-          const Padding(
+        if (_combinedOutput)
+          Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
-              'Drag the handles to arrange files. Arrow buttons also move files.',
+              AndroidDocuments.enabled
+                  ? 'Use each file’s menu to change its order or remove it.'
+                  : 'Drag the handles to arrange files. Arrow buttons also move files.',
               style: TextStyle(fontSize: 12, color: AppTheme.muted),
             ),
           ),
@@ -809,6 +863,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
               active,
               _previews,
               openOriginal: (path) => widget.onOpen(path),
+              imageBuilder: _id == ToolId.scanPdf ? _editPreview : null,
             ),
             icon: const Icon(Icons.open_in_full, size: 17),
           ),
@@ -870,6 +925,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   );
 
   Widget _editPreview(FilePreview data, Widget image) {
+    if (_id == ToolId.scanPdf && !_showScanOriginal) {
+      return ScanPreview(
+        image: data.image!,
+        options: ScanOptions.fromMap(_optionsMap),
+      );
+    }
     if (_id == ToolId.editImage && data.kind == 'image')
       return ImageEditPreview(
         source: data,
@@ -1004,12 +1065,64 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
             'These files have no common output format. Try a smaller selection.',
           ),
       if (_id == ToolId.convert)
-        const Text(
-          'PDF → image exports all pages. Some Office formats and WebP output require an optional local helper.',
-          style: TextStyle(color: AppTheme.muted, fontSize: 12),
-        ),
+        if (_canCombineImagesToPdf) ...[
+          _choice('pdfOutput', 'PDF output', {
+            'combined': 'One combined PDF',
+            'separate': 'Separate PDFs',
+          }, 'combined'),
+          Text(
+            _combineImages
+                ? 'Images become PDF pages in the file list order.'
+                : 'Each image is saved as its own PDF.',
+            style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+          ),
+        ] else
+          const Text(
+            'PDF → image exports all pages. Some Office formats and WebP output require an optional local helper.',
+            style: TextStyle(color: AppTheme.muted, fontSize: 12),
+          ),
       if (_id == ToolId.pdfImages)
         _field('dpi', 'Resolution (DPI)', initial: '150'),
+      if (_id == ToolId.scanPdf) ...[
+        _choice('scanMode', 'Scan appearance', {
+          'color': 'Color',
+          'grayscale': 'Grayscale',
+          'blackAndWhite': 'Black and white',
+        }, 'grayscale'),
+        _scanSlider('contrast', 'Contrast', initial: 1.2, min: .5, max: 3),
+        _scanSlider('brightness', 'Brightness', initial: 0, min: -.5, max: .5),
+        if (_values['scanMode'] == 'blackAndWhite')
+          _scanSlider(
+            'threshold',
+            'Black and white cutoff',
+            initial: .6,
+            min: .1,
+            max: .9,
+          ),
+        _choice('dpi', 'Scan resolution', {
+          '150': '150 DPI · smaller file',
+          '200': '200 DPI · balanced',
+          '300': '300 DPI · print quality',
+        }, '150'),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Show original', style: TextStyle(fontSize: 14)),
+          value: _showScanOriginal,
+          onChanged: _busy
+              ? null
+              : (value) => setState(() => _showScanOriginal = value),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Settings apply to every page. Files are combined in the order shown. The new PDF contains page images; text selection and search are not retained.',
+          style: TextStyle(color: AppTheme.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'PDFs, images and supported documents can be scanned. Document layouts follow the PDF converter; some Office formats need a local helper.',
+          style: TextStyle(color: AppTheme.muted, fontSize: 12),
+        ),
+      ],
       if (_id == ToolId.split) ...[
         _field('every', 'Pages per part', initial: '1'),
         _field(
@@ -1188,6 +1301,46 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         ),
     ],
   );
+  Widget _scanSlider(
+    String name,
+    String label, {
+    required double initial,
+    required double min,
+    required double max,
+  }) {
+    final value = (_values[name] as num?)?.toDouble() ?? initial;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 14)),
+              ),
+              Text(
+                '${(value * 100).round()}%',
+                style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+              ),
+            ],
+          ),
+          Slider(
+            key: ValueKey('scan-$name'),
+            value: value,
+            min: min,
+            max: max,
+            divisions: ((max - min) * 100).round(),
+            label: '${(value * 100).round()}%',
+            semanticFormatterCallback: (v) =>
+                '$label ${(v * 100).round()} percent',
+            onChanged: _busy ? null : (v) => setState(() => _values[name] = v),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _flip(String key, String label) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [

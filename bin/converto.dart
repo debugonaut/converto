@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../lib/core/constants/app_version.dart';
 import 'package:args/args.dart';
 import 'package:converto/core/terminal/slash_prompt.dart';
 import 'package:converto/core/terminal/terminal_input.dart';
@@ -52,7 +53,7 @@ Future<void> _run(List<String> args) async {
     }
 
     if (args.length == 1 && (firstArg == '--version' || firstArg == '-v')) {
-      stdout.writeln('Converto 1.0.0  ·  100% offline  ·  Apache 2.0');
+      stdout.writeln('Converto $appVersion  ·  100% offline  ·  Apache 2.0');
       return;
     }
 
@@ -71,7 +72,12 @@ Future<void> _run(List<String> args) async {
       'unlock',
       'pdf2img',
       'pdf2text',
+      'pdf2html',
       'pdf2office',
+      'ocr',
+      'compare',
+      'repair',
+      'sign',
       'pdfa',
       'redact',
       'info',
@@ -112,7 +118,12 @@ Future<void> _run(List<String> args) async {
         ..addCommand(UnlockCommand())
         ..addCommand(PdfToImageCommand())
         ..addCommand(PdfToTextCommand())
+        ..addCommand(PdfToHtmlCommand())
         ..addCommand(PdfToOfficeCommand())
+        ..addCommand(OcrCommand())
+        ..addCommand(CompareCommand())
+        ..addCommand(RepairCommand())
+        ..addCommand(SignCommand())
         ..addCommand(PdfACommand())
         ..addCommand(RedactCommand())
         ..addCommand(InfoCommand())
@@ -624,22 +635,329 @@ class PdfToTextCommand extends _PdfToolCommand {
   @override
   final name = 'pdf2text';
   @override
-  final description = 'Extract selectable text from a PDF into a .txt file.';
+  final description =
+      'Extract selectable text as TXT, Markdown, or HTML, locally.';
 
   @override
   void configure(ArgParser parser) {
-    parser.addOption('output', abbr: 'o', help: 'Output .txt path');
+    parser
+      ..addOption(
+        'to',
+        abbr: 't',
+        defaultsTo: 'txt',
+        help: 'Output format: txt | md | html',
+      )
+      ..addOption('output', abbr: 'o', help: 'Output text path')
+      ..addOption('password', abbr: 'p', help: 'Password for an encrypted PDF')
+      ..addFlag('print', defaultsTo: false, help: 'Also print the text');
   }
 
   @override
   Future<String> execute(File source) async {
+    final format = (argResults!['to'] as String)
+        .replaceAll('.', '')
+        .toLowerCase();
     final result = await PdfConverter().pdfToText(
       pdfFile: source,
+      targetFormat: format,
+      password: argResults!['password'] as String?,
+      outputPath: argResults!['output'] as String?,
+      onProgress: _printProgress,
+    );
+    if (argResults!['print'] as bool) {
+      stdout.writeln();
+      stdout.writeln(await result.readAsString());
+    }
+    _printSaved([result]);
+    return 'Text extracted successfully!';
+  }
+}
+
+/// PDF to HTML Command
+class PdfToHtmlCommand extends _PdfToolCommand {
+  @override
+  final name = 'pdf2html';
+  @override
+  final description = 'Convert a PDF into a styled, local HTML document.';
+
+  @override
+  void configure(ArgParser parser) {
+    parser
+      ..addOption('output', abbr: 'o', help: 'Output .html path')
+      ..addOption('password', abbr: 'p', help: 'Password for an encrypted PDF')
+      ..addFlag(
+        'layout',
+        defaultsTo: false,
+        help: 'Embed page images for exact layout (not selectable text)',
+      )
+      ..addFlag('print', defaultsTo: false, help: 'Also print the HTML');
+  }
+
+  @override
+  Future<String> execute(File source) async {
+    final converter = PdfConverter();
+    final result = argResults!['layout'] as bool
+        ? await converter.pdfToHtmlVisual(
+            pdfFile: source,
+            password: argResults!['password'] as String?,
+            outputPath: argResults!['output'] as String?,
+            onProgress: _printProgress,
+          )
+        : await converter.pdfToText(
+            pdfFile: source,
+            targetFormat: 'html',
+            password: argResults!['password'] as String?,
+            outputPath: argResults!['output'] as String?,
+            onProgress: _printProgress,
+          );
+    if (argResults!['print'] as bool) {
+      stdout.writeln();
+      stdout.writeln(await result.readAsString());
+    }
+    _printSaved([result]);
+    return 'HTML written successfully!';
+  }
+}
+
+/// OCR Command
+class OcrCommand extends _PdfToolCommand {
+  @override
+  final name = 'ocr';
+  @override
+  final description =
+      'Extract text from scans with local Tesseract; optional searchable PDF.';
+
+  @override
+  void configure(ArgParser parser) {
+    parser
+      ..addOption('lang', defaultsTo: 'eng', help: 'Tesseract language code')
+      ..addOption('dpi', defaultsTo: '300', help: 'Raster DPI for OCR')
+      ..addOption('password', abbr: 'p', help: 'Password for an encrypted PDF')
+      ..addOption('output', abbr: 'o', help: 'Output .txt path')
+      ..addOption('pdf', help: 'Also write a searchable PDF to this path')
+      ..addFlag(
+        'searchable',
+        defaultsTo: false,
+        help: 'Write a searchable PDF next to the text',
+      );
+  }
+
+  @override
+  Future<String> execute(File source) async {
+    final pdfPath = argResults!['pdf'] as String?;
+    final searchable = (argResults!['searchable'] as bool) || pdfPath != null;
+    final result = await PdfEngine.ocr(
+      sourceFile: source,
+      language: argResults!['lang'] as String,
+      dpi: int.parse(argResults!['dpi'] as String),
+      searchablePdf: searchable,
+      password: argResults!['password'] as String?,
+      outputPath: argResults!['output'] as String?,
+      pdfOutputPath: pdfPath,
+      onProgress: _printProgress,
+    );
+    _printSaved([result.textFile, if (result.pdfFile != null) result.pdfFile!]);
+    return 'OCR finished: ${result.characters} characters across '
+        '${result.pageCount} page${result.pageCount == 1 ? '' : 's'}'
+        '${result.pdfFile == null ? '' : ' · searchable PDF written'}';
+  }
+}
+
+/// Compare Command
+class CompareCommand extends Command {
+  @override
+  final name = 'compare';
+  @override
+  final description = 'Compare two PDFs page by page, entirely on-device.';
+
+  CompareCommand() {
+    argParser
+      ..addOption('left-password', help: 'Password for the first PDF')
+      ..addOption('right-password', help: 'Password for the second PDF')
+      ..addOption('dpi', defaultsTo: '72', help: 'Pixel comparison DPI')
+      ..addOption(
+        'report',
+        help: 'Write a side-by-side HTML report to this path',
+      )
+      ..addFlag(
+        'fail-on-diff',
+        defaultsTo: false,
+        help: 'Exit 1 when the PDFs differ',
+      );
+  }
+
+  @override
+  Future<void> run() async {
+    final rest = argResults!.rest;
+    if (rest.length < 2) {
+      throw UsageException('Provide two PDF files to compare.', usage);
+    }
+
+    final left = _requirePdf(rest[0]);
+    final right = _requirePdf(rest[1]);
+    TerminalUI.step('COMPARE: ${left.path} ↔ ${right.path}');
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      final result = await PdfEngine.compare(
+        leftFile: left,
+        rightFile: right,
+        leftPassword: argResults!['left-password'] as String?,
+        rightPassword: argResults!['right-password'] as String?,
+        dpi: int.parse(argResults!['dpi'] as String),
+        reportPath: argResults!['report'] as String?,
+      );
+      stopwatch.stop();
+
+      final verdict = result.identical
+          ? 'Identical on every shared page'
+          : result.changedPages.isEmpty && result.details.isNotEmpty
+          ? result.details.first
+          : '${result.changedPages.length} changed page'
+                '${result.changedPages.length == 1 ? '' : 's'}';
+      TerminalUI.printBox(
+        title: 'PDF Comparison',
+        lines: [
+          '${TerminalUI.style("Left:     ", TerminalUI.gray)}${left.path} (${result.leftPages} pages)',
+          '${TerminalUI.style("Right:    ", TerminalUI.gray)}${right.path} (${result.rightPages} pages)',
+          '${TerminalUI.style("Verdict:  ", TerminalUI.gray)}${result.identical ? TerminalUI.style(verdict, TerminalUI.green) : TerminalUI.style(verdict, TerminalUI.amber)}',
+        ],
+        borderColor: result.identical ? TerminalUI.green : TerminalUI.amber,
+      );
+
+      for (final detail in result.details.take(30)) {
+        stdout.writeln('  ${TerminalUI.style("•", TerminalUI.amber)} $detail');
+      }
+      if (result.details.length > 30) {
+        stdout.writeln(
+          '  ${TerminalUI.style("... ${result.details.length - 30} more differences", TerminalUI.dim)}',
+        );
+      }
+      if (result.report != null) {
+        _printSaved([result.report!]);
+      }
+
+      if (result.identical) {
+        TerminalUI.success(
+          'PDFs are identical!',
+          elapsedMs: stopwatch.elapsedMilliseconds,
+        );
+      } else {
+        stdout.writeln(
+          '  ${TerminalUI.style("Differences found above. Use --fail-on-diff for scripts.", TerminalUI.dim)}',
+        );
+        if (argResults!['fail-on-diff'] as bool) exitCode = 1;
+      }
+    } catch (e) {
+      TerminalUI.error('Comparison failed: ${PdfEngine.errorMessage(e)}');
+      exit(1);
+    }
+  }
+}
+
+/// Repair Command
+class RepairCommand extends _PdfToolCommand {
+  @override
+  final name = 'repair';
+  @override
+  final description =
+      'Rebuild a damaged PDF and optionally strip active content.';
+
+  @override
+  void configure(ArgParser parser) {
+    parser
+      ..addFlag(
+        'sanitize',
+        defaultsTo: false,
+        help: 'Also strip metadata, JavaScript, and attachments',
+      )
+      ..addOption('password', abbr: 'p', help: 'Password for an encrypted PDF')
+      ..addOption('output', abbr: 'o', help: 'Output PDF path');
+  }
+
+  @override
+  Future<String> execute(File source) async {
+    final before = source.lengthSync();
+    final sanitize = argResults!['sanitize'] as bool;
+    final password = argResults!['password'] as String?;
+    final result = await PdfEngine.repair(
+      sourceFile: source,
+      sanitize: sanitize,
+      password: password,
+      outputPath: argResults!['output'] as String?,
+      onProgress: _printProgress,
+    );
+    final after = result.lengthSync();
+    _printSaved([result]);
+    var pages = '?';
+    try {
+      pages = '${(await PdfEngine.info(result, password: password)).pageCount}';
+    } catch (_) {}
+    return 'PDF rebuilt${sanitize ? ' and sanitized' : ''} '
+        '($pages pages, ${FileUtils.formatBytes(before)} → '
+        '${FileUtils.formatBytes(after)})';
+  }
+}
+
+/// Sign Command
+class SignCommand extends _PdfToolCommand {
+  @override
+  final name = 'sign';
+  @override
+  final description =
+      'Digitally sign a PDF with a local certificate (PKCS#12 or PEM).';
+
+  @override
+  void configure(ArgParser parser) {
+    parser
+      ..addOption('p12', help: 'PKCS#12 (.p12/.pfx) bundle path')
+      ..addOption('p12-password', help: 'Password for the PKCS#12 bundle')
+      ..addOption('cert', help: 'PEM certificate path')
+      ..addOption('key', help: 'PEM private key path')
+      ..addOption('reason', help: 'Reason for signing')
+      ..addOption('location', help: 'Signing location')
+      ..addOption('output', abbr: 'o', help: 'Output signed PDF path');
+  }
+
+  @override
+  Future<String> execute(File source) async {
+    final p12 = argResults!['p12'] as String?;
+    final cert = argResults!['cert'] as String?;
+    final key = argResults!['key'] as String?;
+    if (p12 == null && (cert == null || key == null)) {
+      throw UsageException('Provide --p12, or both --cert and --key.', usage);
+    }
+
+    var p12Password = argResults!['p12-password'] as String?;
+    if (p12 != null && p12Password == null && stdin.hasTerminal) {
+      p12Password = await _readSecret('PKCS#12 password (blank if none): ');
+    }
+
+    final result = await PdfEngine.sign(
+      sourceFile: source,
+      p12Path: p12,
+      p12Password: p12Password,
+      certPath: cert,
+      keyPath: key,
+      reason: argResults!['reason'] as String?,
+      location: argResults!['location'] as String?,
       outputPath: argResults!['output'] as String?,
       onProgress: _printProgress,
     );
     _printSaved([result]);
-    return 'Text extracted successfully!';
+
+    var status = 'signature written';
+    try {
+      final info = await PdfEngine.info(result);
+      if (info.signaturesValid == true) {
+        status = 'signature verified valid';
+      } else if (info.signaturesValid == false) {
+        status = 'signature present (trust chain not verified)';
+      } else {
+        status = 'signature present (verification unavailable)';
+      }
+    } catch (_) {}
+    return 'PDF signed: $status!';
   }
 }
 
@@ -755,6 +1073,11 @@ class InfoCommand extends _PdfToolCommand {
       source,
       password: argResults!['password'] as String?,
     );
+    final signatureStatus = info.signatureSummaries.isEmpty
+        ? 'none'
+        : info.signaturesValid == true
+        ? 'valid'
+        : 'present (unverified)';
     TerminalUI.printBox(
       title: 'PDF Details',
       lines: [
@@ -765,6 +1088,9 @@ class InfoCommand extends _PdfToolCommand {
         '${TerminalUI.style("Page size: ", TerminalUI.gray)}${info.firstPageWidth.toStringAsFixed(0)} × ${info.firstPageHeight.toStringAsFixed(0)} pt${info.rotation != 0 ? ' (rotated ${info.rotation}°)' : ''}',
         '${TerminalUI.style("Encrypted: ", TerminalUI.gray)}${info.isEncrypted ? 'yes' : 'no'}',
         '${TerminalUI.style("Tagged:    ", TerminalUI.gray)}${info.isTagged ? 'yes (accessible)' : 'no'}',
+        '${TerminalUI.style("Signed:    ", TerminalUI.gray)}$signatureStatus',
+        for (final signature in info.signatureSummaries)
+          '${TerminalUI.style("           ", TerminalUI.gray)}${TerminalUI.fit(signature, 54)}',
         '${TerminalUI.style("Title:     ", TerminalUI.gray)}${info.title ?? '—'}',
         '${TerminalUI.style("Author:    ", TerminalUI.gray)}${info.author ?? '—'}',
         '${TerminalUI.style("Subject:   ", TerminalUI.gray)}${info.subject ?? '—'}',
@@ -847,7 +1173,8 @@ class PdfToImageCommand extends Command {
   @override
   final name = 'pdf2img';
   @override
-  final description = 'Rasterize PDF pages into high-DPI images (PNG/JPG).';
+  final description =
+      'Rasterize PDF pages into high-DPI images (PNG/JPG/WebP).';
 
   PdfToImageCommand() {
     argParser
@@ -855,13 +1182,13 @@ class PdfToImageCommand extends Command {
         'to',
         abbr: 't',
         defaultsTo: 'png',
-        help: 'Output format (png or jpg)',
+        help: 'Output format (png, jpg, or webp)',
       )
       ..addOption('dpi', defaultsTo: '150', help: 'Rendering DPI resolution')
       ..addOption(
         'output',
         abbr: 'o',
-        help: 'Output directory, or a .png/.jpg path for page 1',
+        help: 'Output directory, or a .png/.jpg/.webp path for page 1',
       );
   }
 
@@ -887,7 +1214,7 @@ class PdfToImageCommand extends Command {
     final explicitFile =
         outputPath != null &&
         !Directory(outputPath).existsSync() &&
-        ['png', 'jpg', 'jpeg'].contains(outputExt);
+        ['png', 'jpg', 'jpeg', 'webp'].contains(outputExt);
 
     TerminalUI.step(
       'Rasterizing ${sourceFile.path} to .$targetFormat ($dpi DPI) ...',
@@ -1011,6 +1338,8 @@ class FormatsCommand extends Command {
   @override
   Future<void> run() async {
     final caps = await PlatformDetector.detect();
+    final tesseract = await PdfEngine.tesseractVersion();
+    final hasWebp = await PdfEngine.hasWebpEncoder();
 
     TerminalUI.printBanner();
 
@@ -1020,6 +1349,8 @@ class FormatsCommand extends Command {
         '${TerminalUI.style("Platform:        ", TerminalUI.gray)}${caps.isWindows ? "Windows" : (caps.isAndroid ? "Android" : (caps.isMacOS ? "macOS" : "Linux"))}',
         '${TerminalUI.style("PDF Engine:      ", TerminalUI.gray)}${TerminalUI.style("● Bundled native engine (offline)", TerminalUI.green)}',
         '${TerminalUI.style("LibreOffice CLI: ", TerminalUI.gray)}${caps.hasLibreOfficeCLI ? TerminalUI.style("● Available (${caps.libreOfficePath})", TerminalUI.green) : TerminalUI.style("○ Fallback active", TerminalUI.gray)}',
+        '${TerminalUI.style("OCR:             ", TerminalUI.gray)}${tesseract == null ? TerminalUI.style("○ Tesseract not installed (optional)", TerminalUI.gray) : TerminalUI.style("● ${TerminalUI.fit(tesseract, 34)}", TerminalUI.green)}',
+        '${TerminalUI.style("WebP encoder:    ", TerminalUI.gray)}${hasWebp ? TerminalUI.style("● Available", TerminalUI.green) : TerminalUI.style("○ cwebp/ImageMagick not installed (optional)", TerminalUI.gray)}',
       ],
       borderColor: TerminalUI.cyan,
     );

@@ -4,8 +4,44 @@ import 'package:image/image.dart' as img;
 import 'package:converto/models/gui/tool_definition.dart';
 import 'package:converto/services/gui/gui_executor.dart';
 import 'package:converto/services/gui/gui_job_controller.dart';
+import 'package:converto/services/pdf/pdf_engine.dart';
 
 void main() {
+  test('image batch worker publishes and records one combined PDF', () async {
+    final scratch = Directory.systemTemp.createTempSync('gui-images-worker-');
+    var historyCount = 0;
+    final job = GuiJobController(
+      recordHistory: (records) async {
+        historyCount += records.length;
+      },
+    );
+    try {
+      final paths = List.generate(4, (index) {
+        final file = File('${scratch.path}/photo-$index.jpg')
+          ..writeAsBytesSync(img.encodeJpg(img.Image(width: 50, height: 30)));
+        return file.path;
+      });
+      await job.run(
+        GuiRequest(
+          tool: ToolId.convert,
+          paths: paths,
+          outputDirectory: '${scratch.path}/out',
+          outputName: 'Photos',
+          options: {'format': 'pdf'},
+        ),
+      );
+      expect(job.error, isNull);
+      expect(job.result!.outputs.single, endsWith('Photos.pdf'));
+      expect(await PdfEngine.pageCount(File(job.result!.outputs.single)), 4);
+      expect(Directory('${scratch.path}/out').listSync().length, 1);
+      expect(historyCount, 1);
+      expect(job.progress, 1);
+    } finally {
+      job.dispose();
+      await PdfEngine.dispose();
+      scratch.deleteSync(recursive: true);
+    }
+  });
   test(
     'real isolate publishes results and busy guard prevents duplicate work',
     () async {

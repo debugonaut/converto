@@ -4,7 +4,7 @@
 
 Converto is a local file conversion toolkit for documents, images, spreadsheets, presentations, and PDFs. Use ordinary terminal commands, open the interactive slash-command menu, or drop file paths into the terminal. Files are processed on your device, with no upload service, account, or telemetry client.
 
-The CLI has **25 operations**, **21 registered source extensions**, and **114 tested source/target pairs**. Native builds and automated verification run on **macOS arm64, Windows x64, and Linux x64**. A native macOS app now adds a searchable tool hub and focused workspaces on top of the same local engine. Windows and Linux GUI builds are not yet part of this preview.
+The CLI has **25 operations**, **21 registered source extensions**, and **114 tested source/target pairs**. Native builds and automated verification run on **macOS arm64, Windows x64, and Linux x64**. Native macOS, Windows and Linux app previews add a searchable tool hub and focused workspaces on top of the same local engine.
 
 [Installation](#installation) · [Usage](#usage) · [Operations](#all-25-operations) · [Formats](#supported-formats) · [Architecture](#architecture) · [Analytics](#verified-analytics) · [Development](#development-and-verification)
 
@@ -23,11 +23,23 @@ The CLI has **25 operations**, **21 registered source extensions**, and **114 te
 
 ## macOS app preview
 
-The native Flutter app offers **19 file tools**: conversion, image editing, PDF
+The native Flutter app offers **20 file tools**: conversion, image editing, scanned PDF creation, PDF
 merge/split/extract/organize, page rotation/crop/numbers/watermark, compression,
 redaction, encryption/unlock, PDF/A, Office export, text extraction and metadata.
 Search or filter the tool catalog, add files with Finder drag and drop or the
 native picker, then explicitly run a tool. Drops never start processing.
+
+In **Convert files**, selecting multiple images with **PDF** output creates
+**one combined PDF** by default. Arrange the file list in page order and choose
+one output name before running. Choose **Separate PDFs** under **PDF output**
+to save one PDF per image instead.
+
+Use **Create scanned PDF** to adjust contrast and brightness across every page
+of a PDF, or turn images and supported documents into one scanned-style PDF.
+Choose color, grayscale, or black and white, compare the preview with the
+original, and select 150–300 DPI for export. The output contains page images;
+searchable text is not retained. Source files stay unchanged. Office inputs use
+the same local converters and optional helpers as ordinary PDF conversion.
 
 Jobs run in a background isolate, stage outputs privately, preserve originals,
 and clean up failed/cancelled batches. Repeated drops deduplicate file paths.
@@ -59,11 +71,81 @@ per-tool results under `build/audit/gui/results.json`; widget and worker tests
 run with the ordinary Flutter test suite. The existing CLI audit below remains
 separate from GUI and native-window validation. See the [Mac app audit](docs/audit/2026-11-01-macos-app.md) for per-tool results and the explicit native-interaction checks still pending.
 
+## Windows and Linux app previews
+
+Both desktop apps share the Mac app's **20 tools**, previews, output naming,
+transactional saves and explicit Run workflow. No accounts, telemetry, runtime
+codec downloads or processing quotas are added. Native manual file-manager,
+dialog, display-scaling and drag/drop checks remain separate from automated tests.
+
+| Platform | CI artifact | Package | Download size |
+|---|---|---|---|
+| Windows 10/11 x64 | `windows-app-x64` | `Converto-Windows-x64.zip` | 24.12 MiB |
+| Linux x86_64, GTK 3, glibc 2.35+ | `linux-app-x64` | `Converto-Linux-x64.tar.gz` | 21.66 MiB |
+| Debian-based Linux amd64 | `linux-app-x64` | `Converto-Linux-amd64.deb` | 15.39 MiB |
+
+Download from a successful [native workflow run](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml).
+On Windows extract the entire ZIP and open `Converto.exe`; the required C++
+runtime is bundled. On Linux extract the entire tar archive and open `converto`
+inside it. Keep `lib/` and `data/` beside the executable. The portable Linux app
+requires neither FUSE nor zenity/kdialog. The .deb adds an application-menu entry
+and a `converto-gui` launcher, leaving the CLI's `converto` command separate.
+
+```sh
+tar -xzf Converto-Linux-x64.tar.gz
+./Converto/converto
+# Debian/Ubuntu package alternative:
+sudo apt install ./Converto-Linux-amd64.deb
+```
+
+Linux is automatically built and exercised on **Ubuntu 22.04 x86_64**; other
+distributions, GNOME/KDE file-manager interactions and Wayland need a manual
+pass. The app occupies **54.41 MiB**, using shared OS GTK/font/GL
+libraries. Installing missing system dependencies can require network access;
+file processing itself remains offline. Optional Office/WebP helpers retain
+their documented requirements. See the [Linux audit](docs/audit/2026-11-01-linux-app.md)
+and [Windows audit](docs/audit/2026-11-01-windows-app.md).
+
+## Android app preview
+
+The Android preview reuses the Flutter tool catalog and local conversion engine,
+with phone navigation, app-private results, and native document import/export.
+Choose local files in Android's system picker, select a tool, and explicitly run
+it. Tap **Export** on each completed result to save a copy to a chosen location;
+opening a result grants the selected viewer temporary read access. Cancelling a
+document dialog keeps the current selection and private result intact.
+Keep the app open while processing; this preview does not schedule background jobs.
+
+Results and optional recent history stay in the app's private storage. Export
+files you want to keep before uninstalling. The release manifest requests no
+network or broad storage permissions. Desktop executable helpers (LibreOffice,
+WebP encoding, Tesseract) are unavailable on Android; operations that require
+them report a capability error. Incoming Android share/open-with intents are
+outside this first preview.
+
+Build with Flutter **3.47.9**, Java 17+, and the Android SDK. Gradle installs the
+matching SDK/NDK components during setup if needed. Dependency installation uses
+the network; conversion does not.
+
+```sh
+flutter pub get
+flutter build apk --release --split-per-abi
+python3 tool/audit_android.py --sdk "$ANDROID_HOME"
+# On a connected 64-bit ARM Android device:
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
+
+The APKs are developer previews signed with the local Android debug key;
+production signing and Play Store publishing are separate work. The Android
+workflow builds and checks per-architecture APKs and retains them as the
+`android-preview-apks` artifact. See the [Android design](docs/superpowers/specs/2026-11-01-android-app.md)
+for scope and verification requirements.
+
 ## Installation
 
 ### Use a native CI bundle
 
-There is **no published GitHub Release or installer yet**. Verified CLI ZIPs are available from the [successful native CI run](https://github.com/debugonaut/converto/actions/runs/41276090021), or a newer successful run of [Verify and Package CLI](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml). CI artifacts have finite retention; build from source if an older artifact has expired.
+There is **no published GitHub Release yet**. Linux desktop previews include a .deb; the CLI ships as a portable bundle. Verified CLI ZIPs are available from the [successful native CI run](https://github.com/debugonaut/converto/actions/runs/41276090021), or a newer successful run of [Verify and Package CLI](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml). CI artifacts have finite retention; build from source if an older artifact has expired.
 
 1. Open the run and download the artifact for your OS. Sign in to GitHub with repository access while the repository is private.
 2. Extract the downloaded artifact, then extract the `Converto-*-CLI.zip` inside it into a permanent folder.
@@ -112,7 +194,8 @@ The core bundle handles the built-in paths listed under [Supported formats](#sup
 | Helper | Adds | Discovery |
 |---|---|---|
 | [LibreOffice](https://www.libreoffice.org/download/) | Legacy DOC/XLS/PPT, ODP, RTF, ODT-to-PDF, and original DOCX/PPTX rendering | Standard macOS/Windows installation paths or `soffice` on `PATH` |
-| [WebP utilities](https://developers.google.com/speed/webp/docs/precompiled) | Genuine WebP encoding | `cwebp` on `PATH` |
+| [WebP utilities](https://developers.google.com/speed/webp/docs/precompiled) | Genuine WebP encoding (PDF pages and images) | `cwebp`, or ImageMagick built with WebP support, on `PATH` |
+| [Tesseract OCR](https://tesseract-ocr.github.io/) | Text extraction and searchable PDFs for scanned PDFs | `tesseract` on `PATH`; language data installed separately |
 | Suitable local fonts | Characters and shaping beyond the built-in Western PDF font | Installed fonts available to LibreOffice |
 
 On Debian/Ubuntu, the full-format CI job installs:
@@ -122,7 +205,14 @@ sudo apt-get update
 sudo apt-get install -y libreoffice webp fonts-noto-cjk
 ```
 
-Converto never installs helpers at runtime. Missing capabilities fail with an explicit diagnostic. Set `CONVERTO_DISABLE_HELPERS=1` for the standalone core profile, and run `converto formats` to inspect format/engine information.
+For OCR, install Tesseract and any language data you need:
+
+```sh
+brew install tesseract          # macOS
+sudo apt install tesseract-ocr  # Debian/Ubuntu
+```
+
+Converto never installs helpers at runtime. Missing capabilities fail with an explicit diagnostic. Set `CONVERTO_DISABLE_HELPERS=1` for the standalone core profile, and run `converto formats` to inspect format/engine information plus OCR and WebP helper availability.
 
 ## Usage
 
@@ -176,30 +266,35 @@ Originals are retained by default. An explicitly selected existing destination i
 
 Conversion history is local JSON, not remote analytics. It contains filenames, paths, formats, sizes, and timestamps, not passwords. Disabling new history writes does not delete earlier history.
 
-## All 25 operations
+## All 30 operations
 
 Use slash names inside the interactive shell. Use the argv name after `converto`; `recent`, `clear`, and `exit` are shell-only actions. Per-command flags are available through `converto <command> --help`.
 
 | Slash command | argv command | Purpose |
 |---|---|---|
 | `/convert` | `convert` | Convert a supported file or batch |
-| `/pdf2img` | `pdf2img` | Export every PDF page as PNG/JPG/JPEG |
-| `/pdf2text` | `pdf2text` | Extract PDF text |
+| `/pdf2img` | `pdf2img` | Export every PDF page as PNG/JPG/JPEG/WebP |
+| `/pdf2text` | `pdf2text` | Extract PDF text, Markdown, or HTML |
+| `/pdf2html` | `pdf2html` | Convert to styled HTML; `--layout` embeds exact page images |
+| `/ocr` | `ocr` | OCR scans with local Tesseract; optional searchable PDF |
 | `/pdf2office` | `pdf2office` | Create DOCX/XLSX/PPTX from PDF content |
 | `/merge` | `merge` | Combine PDFs, images, or mixed groups |
 | `/split` | `split` | Split by page count, ranges, or target size |
 | `/extract` | `extract` | Keep selected pages in the requested order |
 | `/organize` | `organize` | Reorder or delete PDF pages |
 | `/rotate` | `rotate` | Rotate PDF pages |
+| `/compare` | `compare` | Compare two PDFs; optional side-by-side HTML report |
 | `/watermark` | `watermark` | Stamp text on PDF pages |
 | `/page-numbers` | `page-numbers` | Add Page X of N numbering |
 | `/crop` | `crop` | Trim PDF margins in points |
 | `/compress` | `compress` | Compress a PDF, retaining the original if the result grows |
 | `/redact` | `redact` | Remove matching PDF text spans |
+| `/repair` | `repair` | Rebuild a damaged PDF; optional sanitize |
 | `/pdfa` | `pdfa` | Generate PDF/A output; conformance validation remains pending |
 | `/edit` | `edit-image` | Rotate, flip, and re-encode an image |
 | `/protect` | `protect` | Password-protect a PDF |
 | `/unlock` | `unlock` | Remove a known PDF password |
+| `/sign` | `sign` | Sign with a local PKCS#12 or PEM certificate |
 | `/info` | `info` | Inspect PDF metadata and page information |
 | `/formats` | `formats` | List formats and conversion engines |
 | `/privacy` | `privacy` | Display local processing information |
@@ -210,7 +305,7 @@ Use slash names inside the interactive shell. Use the argv name after `converto`
 
 ## Supported formats
 
-These are the **114 source/target pairs exercised by the audit**, not a promise of lossless fidelity for every document.
+These are the format families supported by the local engines. The original **114 source/target pairs** remain the audit baseline; the newer PDF paths (WebP, Markdown, HTML, compare, repair, signing, OCR) are covered by focused CLI tests instead of the full audit matrix. Lossless fidelity is not promised for every document.
 
 | Source extensions | Tested conversion targets | Behavior and requirements |
 |---|---|---|
@@ -218,7 +313,7 @@ These are the **114 source/target pairs exercised by the audit**, not a promise 
 | DOCX, DOC, ODT, RTF, TXT | PDF, TXT | 10 pairs. DOC/RTF and ODT-to-PDF need LibreOffice. DOCX has a disclosed text/table fallback. |
 | XLSX, XLS, CSV | PDF, CSV | 6 pairs. XLS needs LibreOffice. PDF includes every XLSX worksheet; CSV exports the first and reports that choice. |
 | PPTX, PPT, ODP | PDF, PNG, JPG | 9 pairs. PPT/ODP need LibreOffice. PPTX has a disclosed text fallback. Image conversion exports the first slide. |
-| PDF | PNG, JPG, JPEG, TXT, DOCX, XLSX, PPTX, PDF | 8 pairs using the bundled native engine. Generic conversion to an image exports the first page; `pdf2img` exports all pages. |
+| PDF | PNG, JPG, JPEG, WebP, TXT, MD, HTML, DOCX, XLSX, PPTX, PDF | Bundled native engine. Generic conversion to an image exports the first page; `pdf2img` exports all pages. PDF to WebP requires a local encoder. HTML/Markdown/Office output reconstructs content; layout fidelity is not guaranteed. |
 
 TXT/CSV support UTF-8 and BOM-marked UTF-16 LE/BE. Same-format TXT copies preserve their original bytes. Text outside the built-in Western font uses installed LibreOffice/fonts or fails clearly instead of silently dropping characters. Native PDF-to-Office output reconstructs content; original layout and editability are not guaranteed.
 
@@ -228,7 +323,7 @@ All conversion paths below execute on the local machine. The optional helper bra
 
 ```mermaid
 flowchart TD
-    App["Native Mac tool hub<br/>Picker and Finder file drops"] --> Intake["FileIntake<br/>Selection only, deduplicated paths"]
+    App["Native desktop tool hub<br/>Pickers and file-manager drops"] --> Intake["FileIntake<br/>Selection only, deduplicated paths"]
     Intake --> Workspace["Focused tool workspace<br/>Explicit Run"]
     Workspace --> Worker["GUI background isolate<br/>Private batch staging"]
     Worker --> Operations
@@ -246,7 +341,7 @@ flowchart TD
     Operations --> Converters["Dart image, document,<br/>spreadsheet and presentation converters"]
     Operations --> PDF
     Converters --> PDF
-    Converters --> Helpers["Optional installed helpers<br/>LibreOffice and cwebp"]
+    Converters --> Helpers["Optional installed helpers<br/>LibreOffice, cwebp, Tesseract"]
     Converters --> Storage["StorageService<br/>Staged writes and destination checks"]
     PDF --> Storage
     Helpers --> Storage
@@ -256,7 +351,7 @@ flowchart TD
 
 | Boundary | Responsibility |
 |---|---|
-| [`lib/ui/`](lib/ui/) / [`macos/`](macos/) | Native Mac tool hub, focused workspaces, picker/drop integration, history and settings |
+| [`lib/ui/`](lib/ui/), [`macos/`](macos/), [`windows/`](windows/), [`linux/`](linux/) | Shared desktop tool hub, native runners, picker/drop integration, history and settings |
 | [`lib/services/gui/`](lib/services/gui/) | Safe file intake, background worker lifecycle, transactional batch execution and local preferences |
 | [`bin/converto.dart`](bin/converto.dart) | CLI entry, argv commands, exit status, lifecycle cleanup |
 | [`lib/core/terminal/`](lib/core/terminal/) | Shared asynchronous input, bracketed paste, path parsing, slash commands, terminal restoration |
@@ -266,7 +361,7 @@ flowchart TD
 | [`OfficeBridge`](lib/services/office_bridge.dart) / [`LocalProcess`](lib/services/local_process.dart) | Optional helper discovery, isolated Office profiles, temporary work, timeouts, and process errors |
 | [`StorageService`](lib/services/storage_service.dart) / [`HistoryService`](lib/services/history_service.dart) | Local outputs, staged replacement, collision handling, and bounded optional history |
 
-The Mac app and CLI share the processing engines. The app stages whole GUI batches and publishes them only after success. The static landing page remains a separate surface.
+The desktop apps and CLI share the processing engines. The app stages whole GUI batches and publishes them only after success. The static landing page remains a separate surface.
 
 ## Tech stack
 
@@ -274,14 +369,14 @@ Versions below are from the committed dependency lockfile.
 
 | Layer | Technology | Role |
 |---|---|---|
-| Mac desktop app | Flutter, native macOS runner, `desktop_drop`, `file_picker` | Searchable tool catalog, focused workspaces and background isolates |
+| Desktop apps | Flutter, macOS/Windows/GTK 3 runners, `desktop_drop`, native pickers | Searchable tool catalog, focused workspaces and background isolates |
 | Native CLI | Dart AOT, `args` 2.7.0, `path` 1.9.1 | Commands, filesystem handling, async terminal I/O, native executable |
 | PDF generation | `pdf` 3.12.0 | Image/text/table PDF creation |
 | Native PDF processing | `pdf_manipulator` **5.0.1**, pdf_oxide backend | PDF rendering, editing, merging, extraction, and security |
 | Images | `image` 4.3.0 | Local image decoding, transforms, and encoding |
 | Spreadsheets | `excel` 4.0.6, `csv` 6.0.0 | Workbook and CSV parsing/export |
 | Office containers | `archive` 3.6.1, `xml` 6.6.1 | DOCX/PPTX/ODT container and XML handling |
-| Optional helpers | LibreOffice, `cwebp` | Local Office rendering and WebP encoding |
+| Optional helpers | LibreOffice, `cwebp`, Tesseract | Local Office rendering, WebP encoding, and OCR |
 | Build and regression tests | Flutter SDK, `flutter_test` | Dependency resolution, native build hooks, Dart tests and analysis |
 | Optional launcher | Node.js, built-in `child_process` | Start an already-built binary for the exact OS/architecture |
 | Independent acceptance tests | Python, Pillow, PyMuPDF | Synthetic fixtures and independent content/signature checks |
@@ -404,7 +499,11 @@ See each tool's `--help` for arguments. [`build-and-release.yml`](.github/workfl
 - **Desktop terminal validation:** actual Finder/Explorer/Nautilus drag gestures and Windows console/ConPTY behavior remain outstanding. macOS/Linux PTY and Windows piped-input tests cover different execution paths.
 - **Office fidelity:** DOCX/PPTX fallbacks omit original graphics/layout; complex charts, formulas, font shaping, macros, and arbitrary documents are not exhaustively certified. Optional helper-enabled acceptance has not run natively on Windows.
 - **PDF/A:** readable output with identification metadata is not independent conformance certification; a validator such as veraPDF is still needed.
-- **Redaction and scans:** native text redaction works on whole matching spans and can remove adjacent words. Scanned pages need OCR, which is not implemented.
+- **OCR:** `ocr` uses a locally installed Tesseract and its language data; nothing is bundled or downloaded. Without Tesseract the command fails with an install hint. OCR quality depends on scan resolution, language data, and page layout. Searchable-PDF output adds an invisible text layer and never sends the file anywhere.
+- **Signing:** `sign` uses a local PKCS#12 or PEM certificate. A self-signed or untrusted chain is reported as `present (unverified)` rather than silently accepted; a trusted CA chain is needed for a `valid` result. Signing writes a new PDF and never uploads the key. Structural repair is applied automatically when a PDF's trailer is malformed; that rebuild can invalidate pre-existing signatures.
+- **Comparison and repair:** `compare` checks normalized page text with a word-level added/removed summary plus a sampled pixel diff at 72 DPI. `--report report.html` writes a standalone side-by-side report with changed regions outlined in red; pages that exist on only one side are shown too. It is a practical visual/text comparison, not a semantic or legal diff. `repair` rebuilds cross-reference tables and can sanitize active content; it cannot recover content that is missing from the file.
+- **Generated formats:** PDF-to-HTML/Markdown uses the engine's layout reconstruction, so complex tables and multi-column pages may be simplified or reordered. Use `pdf2html --layout` for an exact image-based HTML page (no selectable text). WebP output is verified by file signature and fails explicitly when no local encoder exists.
+- **Redaction and scans:** native text redaction works on whole matching spans and can remove adjacent words. Scanned pages need OCR first; run `ocr --searchable` and then redact the resulting PDF.
 - **Resource and interruption bounds:** no multi-gigabyte, disk-full, power-loss, or long-running CPU interruption certification. Local RAM/disk and codec limits apply; helper timeouts are configurable.
 - **Concurrency:** batches are sequential; simultaneous processes should use separate output destinations. Some image-service options are not exposed through CLI flags.
 - **Distribution:** public release assets, signing/notarization, GUI installers, and the landing page's legacy download targets are not complete. Use the verified CLI bundles or source instructions above.

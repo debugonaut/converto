@@ -1,5 +1,6 @@
 import '../../models/gui/tool_definition.dart';
 import '../../models/gui/file_preview.dart';
+import '../../models/scan_options.dart';
 import '../pdf/pdf_engine.dart';
 
 class WorkspaceValidation {
@@ -9,6 +10,13 @@ class WorkspaceValidation {
     FilePreview? preview,
   }) {
     final errors = <String, String>{};
+    if (tool == ToolId.scanPdf) {
+      try {
+        ScanOptions.fromMap(options);
+      } on ArgumentError catch (error) {
+        errors['scan'] = '${error.message}';
+      }
+    }
     String text(String name) => '${options[name] ?? ''}'.trim();
     int? integer(
       String name, {

@@ -2,16 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../storage_service.dart';
+import '../app_paths.dart';
 
 class GuiPreferences {
   String? outputDirectory;
   bool rememberHistory = true;
   static String dataDirectory(Map<String, String> environment) =>
-      environment['CONVERTO_DATA_DIR'] ??
-      p.join(
-        environment['HOME'] ?? environment['USERPROFILE'] ?? '.',
-        '.converto',
-      );
+      AppPaths.dataDirectory(environment);
   File get _file => File(
     p.join(dataDirectory(Platform.environment), 'desktop_preferences.json'),
   );

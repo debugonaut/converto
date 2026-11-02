@@ -93,6 +93,13 @@ Future<void> main() async {
       final options = <String, Object>{};
       List<String>? paths;
       switch (id) {
+        case ToolId.scanPdf:
+          paths = [source.path, image.path];
+          options.addAll({
+            'scanMode': 'blackAndWhite',
+            'contrast': 1.5,
+            'dpi': '72',
+          });
         case ToolId.convert:
           paths = [image.path];
           options['format'] = 'pdf';
@@ -141,6 +148,18 @@ Future<void> main() async {
             'Chosen output name was not applied',
           );
           switch (id) {
+            case ToolId.scanPdf:
+              check(result.outputs.length == 1, 'Scan must publish one PDF');
+              check(
+                await PdfEngine.pageCount(File(result.outputs.single)) == 4,
+                'Scan page count',
+              );
+              check(
+                (await PdfEngine.extractText(
+                  File(result.outputs.single),
+                )).trim().isEmpty,
+                'Scan must contain image-only pages',
+              );
             case ToolId.watermark:
               Future<String> pixels(File file, String directory) async {
                 final pages = await PdfEngine.renderPages(

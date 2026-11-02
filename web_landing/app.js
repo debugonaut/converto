@@ -46,27 +46,28 @@
     const primaryBtn = document.getElementById('primaryDownloadBtn');
     const primaryText = document.getElementById('primaryDownloadText');
     const downloadMeta = document.getElementById('downloadMeta');
+    const appleSilicon = isAppleSilicon();
 
     const downloadProfiles = {
       macos: {
         name: 'macOS',
-        buttonText: isAppleSilicon() ? 'Download for macOS (Apple Silicon)' : 'Download for macOS (Intel)',
-        url: isAppleSilicon()
-          ? 'https://github.com/releases/download/v1.0.0/Converto-macOS-arm64.dmg'
-          : 'https://github.com/releases/download/v1.0.0/Converto-macOS-x64.dmg',
-        meta: 'Apple Silicon & Intel • Universal .dmg • macOS 11.0+'
+        buttonText: appleSilicon ? 'Download for macOS (Apple Silicon)' : 'Download for macOS (Intel)',
+        url: appleSilicon
+          ? 'downloads/Converto-macOS-arm64.zip'
+          : 'downloads/Converto-macOS-x86_64.zip',
+        meta: `Developer preview • ${appleSilicon ? '19.55' : '21.45'} MiB ZIP • macOS 13.0+`
       },
       windows: {
         name: 'Windows',
-        buttonText: 'Download for Windows',
-        url: 'https://github.com/releases/download/v1.0.0/Converto-Windows-Setup.exe',
-        meta: 'x64 Installer (.exe) • Windows 10 & 11'
+        buttonText: 'Download for Windows (x64)',
+        url: 'downloads/Converto-Windows-x64.zip',
+        meta: 'Developer preview • 24.12 MiB ZIP • Windows 10 & 11 (x64)'
       },
       linux: {
         name: 'Linux',
-        buttonText: 'Download for Linux (AppImage)',
-        url: 'https://github.com/releases/download/v1.0.0/Converto-Linux.AppImage',
-        meta: 'x86_64 AppImage • Ubuntu, Debian, Fedora, Arch'
+        buttonText: 'Download for Linux (x64)',
+        url: 'downloads/Converto-Linux-x64.tar.gz',
+        meta: 'Developer preview • 21.66 MiB tar.gz • GTK 3 • glibc 2.35+'
       },
       android: {
         name: 'Android',
@@ -85,7 +86,11 @@
     const profile = downloadProfiles[os] || downloadProfiles.macos;
 
     if (deviceLabel) deviceLabel.textContent = `Detected device: ${profile.name}`;
-    if (primaryBtn) primaryBtn.href = profile.url;
+    if (primaryBtn) {
+      primaryBtn.href = profile.url;
+      if (os === 'macos' || os === 'windows' || os === 'linux') primaryBtn.download = profile.url.split('/').pop();
+      else primaryBtn.removeAttribute('download');
+    }
     if (primaryText) primaryText.textContent = profile.buttonText;
     if (downloadMeta) downloadMeta.textContent = profile.meta;
 

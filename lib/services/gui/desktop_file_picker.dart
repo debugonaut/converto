@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
+import 'android_documents.dart';
 
 /// GTK is already required by Flutter; no zenity/kdialog process is needed.
 class DesktopFilePicker {
@@ -9,6 +10,7 @@ class DesktopFilePicker {
   static Future<List<String>?> pickFiles({
     required List<String> extensions,
   }) async {
+    if (AndroidDocuments.enabled) return AndroidDocuments.pickFiles();
     if (Platform.isLinux) {
       return channel.invokeListMethod<String>('pickFiles', {
         'extensions': extensions,

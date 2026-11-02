@@ -21,4 +21,5 @@ IconData toolIcon(ToolId id) => switch (id) {
   ToolId.pdfa => Icons.inventory_2_outlined,
   ToolId.unlock => Icons.lock_open_rounded,
   ToolId.info => Icons.info_outline_rounded,
+  ToolId.scanPdf => Icons.document_scanner_outlined,
 };
