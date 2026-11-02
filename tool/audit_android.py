@@ -46,7 +46,7 @@ def audit(apk, sdk):
     assert manifest.get('package') == 'com.converto.app'
     version, build = version_info()
     assert manifest.get(ANDROID + 'versionName') == version
-    assert manifest.get(ANDROID + 'versionCode') == str(build)
+    version_code = int(manifest.get(ANDROID + 'versionCode'))
     permissions = [item.get(ANDROID + 'name') for item in manifest.findall('uses-permission')]
     forbidden = {'android.permission.INTERNET', 'android.permission.MANAGE_EXTERNAL_STORAGE',
                  'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'}
@@ -74,11 +74,15 @@ def audit(apk, sdk):
             for library in ['libflutter.so', 'libapp.so', 'libpdf_oxide.so']:
                 assert f'lib/{abi}/{library}' in native, f'Missing {library} for {abi}'
     assert native, 'APK contains no native engine'
+    # Flutter adds an ABI prefix when --split-per-abi is used.
+    abis = {name.split('/')[1] for name in native}
+    offsets = {'armeabi-v7a': 1000, 'arm64-v8a': 2000, 'x86_64': 4000}
+    assert len(abis) == 1 and version_code == offsets[next(iter(abis))] + build
     signature = run(tools / 'apksigner', 'verify', '--print-certs', apk)
     run(tools / 'zipalign', '-c', '-P', '16', '4', apk)
     uses_sdk = manifest.find('uses-sdk')
     return {'apk': str(apk), 'bytes': apk.stat().st_size,
-            'version': version, 'build': build,
+            'version': version, 'build': build, 'versionCode': version_code,
             'sha256': hashlib.sha256(apk.read_bytes()).hexdigest(),
             'min_sdk': uses_sdk.get(ANDROID + 'minSdkVersion'),
             'target_sdk': uses_sdk.get(ANDROID + 'targetSdkVersion'),
