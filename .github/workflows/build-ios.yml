@@ -13,6 +13,20 @@ jobs:
   ios:
     runs-on: macos-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: simulator
+            flags: --simulator --debug
+            app: build/ios/iphonesimulator/Runner.app
+            artifact: ios-simulator-preview
+            archive: Converto-iOS-Simulator.zip
+          - target: device
+            flags: --release --no-codesign
+            app: build/ios/iphoneos/Runner.app
+            artifact: ios-device-unsigned
+            archive: Converto-iOS-unsigned.zip
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -20,33 +34,32 @@ jobs:
           flutter-version: '3.47.9'
           channel: stable
           cache: true
+      - uses: actions/cache/restore@v4
+        id: native-cache
+        with:
+          path: .dart_tool/hooks_runner
+          key: ios-native-3.47.9-${{ runner.arch }}-${{ matrix.target }}-${{ hashFiles('pubspec.lock') }}
       - run: flutter pub get
       - run: flutter analyze --no-pub
       - run: dart tool/verify_cli.dart
-      - name: Build iOS simulator preview
-        run: flutter build ios --simulator --debug --no-pub
-      - name: Verify simulator package
-        run: python3 tool/audit_ios.py build/ios/iphonesimulator/Runner.app
-      - name: Archive simulator app
-        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app build/Converto-iOS-Simulator.zip
+      - name: Build iOS ${{ matrix.target }} preview
+        run: flutter build ios ${{ matrix.flags }} --no-pub
+      - name: Verify iOS package
+        run: python3 tool/audit_ios.py "${{ matrix.app }}" --output "build/audit/ios/${{ matrix.target }}.json"
+      - name: Archive iOS app
+        run: ditto -c -k --sequesterRsrc --keepParent "${{ matrix.app }}" "build/${{ matrix.archive }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-simulator-preview
+          name: ${{ matrix.artifact }}
           compression-level: 0
-          path: build/Converto-iOS-Simulator.zip
-      - name: Build unsigned iPhone and iPad preview
-        run: flutter build ios --release --no-codesign --no-pub
-      - name: Verify unsigned device package
-        run: python3 tool/audit_ios.py build/ios/iphoneos/Runner.app --output build/audit/ios/device.json
-      - name: Archive unsigned device app
-        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app build/Converto-iOS-unsigned.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-device-unsigned
-          compression-level: 0
-          path: build/Converto-iOS-unsigned.zip
+          path: build/${{ matrix.archive }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-package-audit
+          name: ios-${{ matrix.target }}-package-audit
           path: build/audit/ios/*.json
+      - uses: actions/cache/save@v4
+        if: always() && steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: .dart_tool/hooks_runner
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}

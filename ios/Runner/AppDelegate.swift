@@ -15,7 +15,7 @@ import UniformTypeIdentifiers
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.applicationRegistrar
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ConvertoDocuments") else { return }
     documents = IOSDocuments { [weak registrar] in registrar?.viewController }
     let channel = FlutterMethodChannel(name: "com.converto.app/documents", binaryMessenger: registrar.messenger())
     channel.setMethodCallHandler { [weak self] call, result in
