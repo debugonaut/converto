@@ -80,9 +80,9 @@ dialog, display-scaling and drag/drop checks remain separate from automated test
 
 | Platform | CI artifact | Package | Download size |
 |---|---|---|---|
-| Windows 10/11 x64 | `windows-app-x64` | `Converto-Windows-x64.zip` | 24.12 MiB |
-| Linux x86_64, GTK 3, glibc 2.35+ | `linux-app-x64` | `Converto-Linux-x64.tar.gz` | 21.66 MiB |
-| Debian-based Linux amd64 | `linux-app-x64` | `Converto-Linux-amd64.deb` | 15.39 MiB |
+| Windows 10/11 x64 | `windows-app-x64` | `Converto-Windows-x64.zip` | 24.20 MiB |
+| Linux x86_64, GTK 3, glibc 2.35+ | `linux-app-x64` | `Converto-Linux-x64.tar.gz` | 21.73 MiB |
+| Debian-based Linux amd64 | `linux-app-x64` | `Converto-Linux-amd64.deb` | 15.44 MiB |
 
 Download from a successful [native workflow run](https://github.com/debugonaut/converto/actions/workflows/build-and-release.yml).
 On Windows extract the entire ZIP and open `Converto.exe`; the required C++
@@ -140,6 +140,23 @@ production signing and Play Store publishing are separate work. The Android
 workflow builds and checks per-architecture APKs and retains them as the
 `android-preview-apks` artifact. See the [Android design](docs/superpowers/specs/2026-11-01-android-app.md)
 for scope and verification requirements.
+
+## iOS and iPadOS preview development
+
+The iOS runner and native Files bridge are under development on
+`codex/mobile-preview`. They share Android's app-private results, explicit
+import/export and the desktop conversion engine. Phone layouts and channel
+behavior have Flutter test coverage; iOS native builds require full Xcode.
+
+```sh
+flutter pub get
+flutter build ios --simulator --debug
+flutter build ios --release --no-codesign
+```
+
+Unsigned device apps require developer signing before installation. TestFlight
+and App Store distribution are separate steps; neither is published yet.
+See the [iOS preview scope](docs/superpowers/specs/2026-11-02-ios-preview.md).
 
 ## Installation
 

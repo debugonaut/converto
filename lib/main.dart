@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'services/gui/linux_startup_probe.dart';
 import 'core/theme/app_theme.dart';
 import 'ui/screens/home_dashboard.dart';
-import 'services/gui/android_documents.dart';
+import 'services/gui/mobile_documents.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isAndroid) {
+  if (Platform.isAndroid || Platform.isIOS) {
     try {
-      await AndroidDocuments.initialize();
+      await MobileDocuments.initialize();
     } catch (error) {
       runApp(
         MaterialApp(

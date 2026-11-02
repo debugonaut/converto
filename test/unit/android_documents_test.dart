@@ -1,26 +1,35 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:converto/services/app_paths.dart';
-import 'package:converto/services/gui/android_documents.dart';
+import 'package:converto/services/gui/mobile_documents.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  test('mobile document flows are enabled on Android and iOS only', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    for (final platform in TargetPlatform.values) {
+      debugDefaultTargetPlatformOverride = platform;
+      expect(
+        MobileDocuments.enabled,
+        platform == TargetPlatform.android || platform == TargetPlatform.iOS,
+      );
+    }
+  });
   tearDown(
-    () => messenger.setMockMethodCallHandler(AndroidDocuments.channel, null),
+    () => messenger.setMockMethodCallHandler(MobileDocuments.channel, null),
   );
 
   test(
-    'Android paths are private and desktop environment overrides still win',
+    'mobile paths are private and desktop environment overrides still win',
     () async {
-      messenger.setMockMethodCallHandler(AndroidDocuments.channel, (
-        call,
-      ) async {
+      messenger.setMockMethodCallHandler(MobileDocuments.channel, (call) async {
         expect(call.method, 'storagePaths');
         return {'data': '/private/app/data', 'output': '/private/app/results'};
       });
-      await AndroidDocuments.initialize();
+      await MobileDocuments.initialize();
       expect(AppPaths.dataDirectory({}), '/private/app/data');
       expect(AppPaths.mobileOutputDirectory, '/private/app/results');
       expect(
@@ -37,9 +46,7 @@ void main() {
   test(
     'document cancellation is distinct from an empty file selection or failure',
     () async {
-      messenger.setMockMethodCallHandler(AndroidDocuments.channel, (
-        call,
-      ) async {
+      messenger.setMockMethodCallHandler(MobileDocuments.channel, (call) async {
         if (call.method == 'pickFiles') return null;
         expect(call.method, 'exportFile');
         expect(call.arguments, {
@@ -47,23 +54,21 @@ void main() {
         });
         return false;
       });
-      expect(await AndroidDocuments.pickFiles(), isNull);
+      expect(await MobileDocuments.pickFiles(), isNull);
       expect(
-        await AndroidDocuments.exportFile(
+        await MobileDocuments.exportFile(
           '/private/results/name with spaces.pdf',
         ),
         isFalse,
       );
-      messenger.setMockMethodCallHandler(AndroidDocuments.channel, (
-        call,
-      ) async {
+      messenger.setMockMethodCallHandler(MobileDocuments.channel, (call) async {
         throw PlatformException(
           code: 'DOCUMENT_ERROR',
           message: 'Provider unavailable',
         );
       });
       await expectLater(
-        AndroidDocuments.exportFile('/result.pdf'),
+        MobileDocuments.exportFile('/result.pdf'),
         throwsA(isA<PlatformException>()),
       );
     },
@@ -77,10 +82,10 @@ void main() {
         '/cache/import/1/photo one.png',
       ];
       messenger.setMockMethodCallHandler(
-        AndroidDocuments.channel,
+        MobileDocuments.channel,
         (call) async => paths,
       );
-      expect(await AndroidDocuments.pickFiles(), paths);
+      expect(await MobileDocuments.pickFiles(), paths);
     },
   );
 }

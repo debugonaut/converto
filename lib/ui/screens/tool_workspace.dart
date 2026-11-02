@@ -7,7 +7,7 @@ import '../../models/edit_options.dart';
 import '../../models/scan_options.dart';
 import '../../models/gui/file_preview.dart';
 import '../../services/gui/local_preview_service.dart';
-import '../../services/gui/android_documents.dart';
+import '../../services/gui/mobile_documents.dart';
 import '../../services/gui/output_names.dart';
 import '../../services/gui/workspace_validation.dart';
 import '../widgets/file_preview_view.dart';
@@ -646,7 +646,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
 
   Widget _actionControls(bool valid) => LayoutBuilder(
     builder: (context, box) {
-      Widget folder() => AndroidDocuments.enabled
+      Widget folder() => MobileDocuments.enabled
           ? const Text(
               'Saved in this app · export a copy after processing',
               style: TextStyle(fontSize: 12, color: AppTheme.muted),
@@ -778,7 +778,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                   ),
                   SizedBox(height: 14),
                   Text(
-                    AndroidDocuments.enabled
+                    MobileDocuments.enabled
                         ? 'Tap to choose files'
                         : 'Drop files here or choose files',
                   ),
@@ -820,7 +820,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
           Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
-              AndroidDocuments.enabled
+              MobileDocuments.enabled
                   ? 'Use each file’s menu to change its order or remove it.'
                   : 'Drag the handles to arrange files. Arrow buttons also move files.',
               style: TextStyle(fontSize: 12, color: AppTheme.muted),

@@ -9,6 +9,7 @@ import struct
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
+from app_version import version_info
 
 ANDROID = '{http://schemas.android.com/apk/res/android}'
 MACHINES = {'armeabi-v7a': 40, 'arm64-v8a': 183, 'x86_64': 62}
@@ -43,6 +44,9 @@ def audit(apk, sdk):
     manifest_text = run(analyzer, 'manifest', 'print', apk)
     manifest = ET.fromstring(manifest_text)
     assert manifest.get('package') == 'com.converto.app'
+    version, build = version_info()
+    assert manifest.get(ANDROID + 'versionName') == version
+    assert manifest.get(ANDROID + 'versionCode') == str(build)
     permissions = [item.get(ANDROID + 'name') for item in manifest.findall('uses-permission')]
     forbidden = {'android.permission.INTERNET', 'android.permission.MANAGE_EXTERNAL_STORAGE',
                  'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'}
@@ -74,6 +78,7 @@ def audit(apk, sdk):
     run(tools / 'zipalign', '-c', '-P', '16', '4', apk)
     uses_sdk = manifest.find('uses-sdk')
     return {'apk': str(apk), 'bytes': apk.stat().st_size,
+            'version': version, 'build': build,
             'sha256': hashlib.sha256(apk.read_bytes()).hexdigest(),
             'min_sdk': uses_sdk.get(ANDROID + 'minSdkVersion'),
             'target_sdk': uses_sdk.get(ANDROID + 'targetSdkVersion'),

@@ -9,7 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/file_intake.dart';
-import '../../services/gui/android_documents.dart';
+import '../../services/gui/mobile_documents.dart';
 import '../../services/gui/desktop_file_picker.dart';
 import '../../services/gui/gui_job_controller.dart';
 import '../../services/gui/gui_preferences.dart';
@@ -38,7 +38,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   bool _recent = false;
   bool _dragging = false;
   bool _documentBusy = false;
-  bool get _android => AndroidDocuments.enabled;
+  bool get _mobile => MobileDocuments.enabled;
   int _pendingIntakes = 0;
   int _intakeRevision = 0;
   String _query = '';
@@ -144,12 +144,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
         _notice('This file has been moved or deleted.');
         return;
       }
-      if (_android) {
+      if (_mobile) {
         if (reveal) {
-          if (await AndroidDocuments.exportFile(path))
-            _notice('Copy exported.');
+          if (await MobileDocuments.exportFile(path)) _notice('Copy exported.');
         } else {
-          await AndroidDocuments.openFile(path);
+          await MobileDocuments.openFile(path);
         }
       } else if (reveal) {
         await FileUtils.revealInFileManager(path);
@@ -158,7 +157,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
       }
     } catch (e) {
       _notice(
-        'Could not ${reveal && _android ? 'export' : 'open'} this file: ${_errorText(e)}',
+        'Could not ${reveal && _mobile ? 'export' : 'open'} this file: ${_errorText(e)}',
       );
     } finally {
       _documentBusy = false;
@@ -181,11 +180,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_android)
+                  if (_mobile)
                     const Text(
                       'Results are saved privately in this app. Use Export on a completed result to save a copy to your chosen folder. Uninstalling removes private results.',
                     ),
-                  if (!_android) ...[
+                  if (!_mobile) ...[
                     const Text(
                       'Output folder',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -234,17 +233,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ),
                   const SizedBox(height: 8),
                   const Text('PDF & image processing: built in'),
-                  if (!_android)
+                  if (!_mobile)
                     Text(
                       'LibreOffice: ${capabilities.hasLibreOfficeCLI ? 'available' : 'not installed (optional)'}',
                     ),
-                  if (!_android)
+                  if (!_mobile)
                     Text(
                       'WebP encoder: ${webp != null ? 'available' : 'not installed (optional)'}',
                     ),
                   const SizedBox(height: 10),
                   Text(
-                    _android
+                    _mobile
                         ? 'Desktop helpers (LibreOffice, WebP encoding and OCR) are unavailable on Android. Tools that require them report an explicit error.'
                         : 'Optional helpers are never downloaded automatically. Some Office inputs and WebP output need a local helper.',
                     style: TextStyle(color: AppTheme.muted, fontSize: 12),
@@ -499,7 +498,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       ),
                     ),
                   ),
-                  if (_android && compact && _tool == null)
+                  if (_mobile && compact && _tool == null)
                     NavigationBar(
                       selectedIndex: _recent ? 1 : 0,
                       onDestinationSelected: _job.busy || _pendingIntakes > 0
@@ -519,8 +518,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         ),
                       ],
                     ),
-                  if (!compact || !_android) const Divider(),
-                  if (!compact || !_android)
+                  if (!compact || !_mobile) const Divider(),
+                  if (!compact || !_mobile)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 30,
@@ -536,7 +535,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             ),
                           ),
                           const Spacer(),
-                          if (!_android)
+                          if (!_mobile)
                             TextButton(
                               onPressed: _cli,
                               child: const Text(
@@ -584,7 +583,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
           ],
         ),
-        if (!_android)
+        if (!_mobile)
           Row(
             children: [
               _nav(
@@ -609,7 +608,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     ),
   );
 
-  Widget _dropTarget({required Widget child}) => _android
+  Widget _dropTarget({required Widget child}) => _mobile
       ? child
       : DropTarget(
           enable: !_job.busy,
@@ -701,7 +700,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       Expanded(
                         child: Text(
                           _paths.isEmpty
-                              ? (_android
+                              ? (_mobile
                                     ? 'Choose files to see compatible tools'
                                     : 'Drop files to see compatible tools')
                               : '${_paths.length} files selected · showing compatible tools',
@@ -920,7 +919,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
             onTap: () => _open(item.targetPath),
             trailing: IconButton(
-              tooltip: _android
+              tooltip: _mobile
                   ? 'Export result'
                   : Platform.isWindows
                   ? 'Show in Explorer'
@@ -928,9 +927,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ? 'Show in Finder'
                   : 'Show in file manager',
               onPressed: () => _open(item.targetPath, reveal: true),
-              icon: Icon(
-                _android ? Icons.save_alt : Icons.folder_open_outlined,
-              ),
+              icon: Icon(_mobile ? Icons.save_alt : Icons.folder_open_outlined),
             ),
           ),
       ],

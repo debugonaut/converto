@@ -2,6 +2,7 @@ name: Verify and Package Converto
 
 on:
   push:
+    branches: [main, 'codex/release-*']
   pull_request:
   workflow_dispatch:
 

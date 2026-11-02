@@ -5,7 +5,7 @@ import '../../core/utils/file_utils.dart';
 import '../../models/gui/file_preview.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/local_preview_service.dart';
-import '../../services/gui/android_documents.dart';
+import '../../services/gui/mobile_documents.dart';
 import '../../services/gui/output_names.dart';
 import 'file_preview_view.dart';
 import 'output_name_field.dart';
@@ -104,7 +104,7 @@ class WorkspaceFileList extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    if (!AndroidDocuments.enabled)
+                    if (!MobileDocuments.enabled)
                       ReorderableDragStartListener(
                         index: index,
                         enabled: !locked,
@@ -171,7 +171,7 @@ class WorkspaceFileList extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (paths.length > 1 && !AndroidDocuments.enabled)
+                    if (paths.length > 1 && !MobileDocuments.enabled)
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -191,7 +191,7 @@ class WorkspaceFileList extends StatelessWidget {
                           ),
                         ],
                       ),
-                    if (AndroidDocuments.enabled)
+                    if (MobileDocuments.enabled)
                       PopupMenuButton<String>(
                         tooltip: 'File actions',
                         enabled: !locked,

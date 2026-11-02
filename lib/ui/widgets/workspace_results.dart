@@ -5,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/file_utils.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/gui_executor.dart';
-import '../../services/gui/android_documents.dart';
+import '../../services/gui/mobile_documents.dart';
 import '../../services/gui/local_preview_service.dart';
 import '../tool_icons.dart';
 import 'file_preview_view.dart';
@@ -169,7 +169,7 @@ class WorkspaceResults extends StatelessWidget {
                     openOriginal: (path) => onOpen(path),
                   ),
                   trailing:
-                      AndroidDocuments.enabled &&
+                      MobileDocuments.enabled &&
                           MediaQuery.sizeOf(context).width < 600
                       ? TextButton.icon(
                           onPressed: () => onOpen(output, reveal: true),
@@ -198,7 +198,7 @@ class WorkspaceResults extends StatelessWidget {
                               icon: const Icon(Icons.open_in_new, size: 18),
                             ),
                             IconButton(
-                              tooltip: AndroidDocuments.enabled
+                              tooltip: MobileDocuments.enabled
                                   ? 'Export result'
                                   : Platform.isWindows
                                   ? 'Show in Explorer'
@@ -207,7 +207,7 @@ class WorkspaceResults extends StatelessWidget {
                                   : 'Show in file manager',
                               onPressed: () => onOpen(output, reveal: true),
                               icon: Icon(
-                                AndroidDocuments.enabled
+                                MobileDocuments.enabled
                                     ? Icons.save_alt
                                     : Icons.folder_open_outlined,
                                 size: 19,

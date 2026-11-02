@@ -1,0 +1,52 @@
+name: Build iOS preview
+
+on:
+  push:
+    branches: [main, codex/mobile-preview]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub
+      - name: Build iOS simulator preview
+        run: flutter build ios --simulator --debug --no-pub
+      - name: Verify simulator package
+        run: python3 tool/audit_ios.py build/ios/iphonesimulator/Runner.app
+      - name: Archive simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app build/Converto-iOS-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-preview
+          compression-level: 0
+          path: build/Converto-iOS-Simulator.zip
+      - name: Build unsigned iPhone and iPad preview
+        run: flutter build ios --release --no-codesign --no-pub
+      - name: Verify unsigned device package
+        run: python3 tool/audit_ios.py build/ios/iphoneos/Runner.app --output build/audit/ios/device.json
+      - name: Archive unsigned device app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app build/Converto-iOS-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-device-unsigned
+          compression-level: 0
+          path: build/Converto-iOS-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-package-audit
+          path: build/audit/ios/*.json

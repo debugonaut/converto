@@ -34,3 +34,6 @@ web_landing/downloads/*.tar.gz
 
 web_landing/downloads/*.deb
 web_landing/downloads/*.apk
+web_landing/downloads/release.json
+.idea/
+*.iml

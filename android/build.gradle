@@ -5,6 +5,17 @@ allprojects {
     }
 }
 
+// Legacy desktop_drop pins API 33, below current Flutter embedding dependencies.
+// Align library compilation with this preview's API 36 toolchain; runtime SDK
+// requirements remain controlled by the app's Flutter configuration.
+subprojects { project ->
+    project.plugins.withId('com.android.library') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            android.compileSdk = 36
+        }
+    }
+}
+
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"

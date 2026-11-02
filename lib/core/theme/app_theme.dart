@@ -28,7 +28,7 @@ class AppTheme {
     platform: platform,
     fontFamily: switch (platform) {
       TargetPlatform.windows => 'Segoe UI',
-      TargetPlatform.macOS => '.AppleSystemUIFont',
+      TargetPlatform.macOS || TargetPlatform.iOS => '.AppleSystemUIFont',
       _ => 'Roboto',
     },
     scaffoldBackgroundColor: background,

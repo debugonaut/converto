@@ -3,18 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../app_paths.dart';
 
-class AndroidDocuments {
+class MobileDocuments {
   static const channel = MethodChannel('com.converto.app/documents');
-  static bool get enabled =>
-      debugDefaultTargetPlatformOverride == TargetPlatform.android ||
-      Platform.isAndroid;
+  static bool get enabled {
+    final override = debugDefaultTargetPlatformOverride;
+    if (override != null)
+      return override == TargetPlatform.android ||
+          override == TargetPlatform.iOS;
+    return Platform.isAndroid || Platform.isIOS;
+  }
 
   static Future<void> initialize() async {
     final paths = await channel.invokeMapMethod<String, String>('storagePaths');
     final data = paths?['data'];
     final output = paths?['output'];
     if (data == null || output == null) {
-      throw const FileSystemException('Android storage is unavailable.');
+      throw const FileSystemException('App storage is unavailable.');
     }
     AppPaths.configureMobile(data: data, output: output);
   }

@@ -55,31 +55,31 @@
         url: appleSilicon
           ? 'downloads/Converto-macOS-arm64.zip'
           : 'downloads/Converto-macOS-x86_64.zip',
-        meta: `Developer preview • ${appleSilicon ? '19.55' : '21.45'} MiB ZIP • macOS 13.0+`
+        meta: `Developer preview • ${appleSilicon ? '19.63' : '21.52'} MiB ZIP • macOS 13.0+`
       },
       windows: {
         name: 'Windows',
         buttonText: 'Download for Windows (x64)',
         url: 'downloads/Converto-Windows-x64.zip',
-        meta: 'Developer preview • 24.12 MiB ZIP • Windows 10 & 11 (x64)'
+        meta: 'Developer preview • 24.20 MiB ZIP • Windows 10 & 11 (x64)'
       },
       linux: {
         name: 'Linux',
         buttonText: 'Download for Linux (x64)',
         url: 'downloads/Converto-Linux-x64.tar.gz',
-        meta: 'Developer preview • 21.66 MiB tar.gz • GTK 3 • glibc 2.35+'
+        meta: 'Developer preview • 21.73 MiB tar.gz • GTK 3 • glibc 2.35+'
       },
       android: {
         name: 'Android',
-        buttonText: 'Download Android APK',
-        url: 'https://github.com/releases/download/v1.0.0/Converto-release.apk',
-        meta: 'Standalone APK • Android 8.0+'
+        buttonText: 'Download Android preview (ARM64)',
+        url: 'downloads/Converto-Android-arm64-v8a.apk',
+        meta: 'Developer preview • Android 7.0+ • arm64-v8a'
       },
       ios: {
         name: 'iOS / iPadOS',
-        buttonText: 'Get on TestFlight',
-        url: 'https://testflight.apple.com',
-        meta: 'Offline vector conversion • iOS 15.0+'
+        buttonText: 'View iOS preview progress',
+        url: '#downloads-ios',
+        meta: 'iPhone and iPad preview in development • iOS 15.0+'
       }
     };
 
@@ -88,7 +88,7 @@
     if (deviceLabel) deviceLabel.textContent = `Detected device: ${profile.name}`;
     if (primaryBtn) {
       primaryBtn.href = profile.url;
-      if (os === 'macos' || os === 'windows' || os === 'linux') primaryBtn.download = profile.url.split('/').pop();
+      if (os === 'macos' || os === 'windows' || os === 'linux' || os === 'android') primaryBtn.download = profile.url.split('/').pop();
       else primaryBtn.removeAttribute('download');
     }
     if (primaryText) primaryText.textContent = profile.buttonText;
