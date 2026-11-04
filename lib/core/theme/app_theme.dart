@@ -22,15 +22,16 @@ class AppTheme {
           ? TargetPlatform.macOS
           : TargetPlatform.linux);
 
+  static String get nativeFontFamily => switch (platform) {
+    TargetPlatform.windows => 'Segoe UI',
+    TargetPlatform.macOS || TargetPlatform.iOS => '.AppleSystemUIFont',
+    _ => 'Roboto',
+  };
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     platform: platform,
-    fontFamily: switch (platform) {
-      TargetPlatform.windows => 'Segoe UI',
-      TargetPlatform.macOS || TargetPlatform.iOS => '.AppleSystemUIFont',
-      _ => 'Roboto',
-    },
+    fontFamily: nativeFontFamily,
     scaffoldBackgroundColor: background,
     colorScheme: const ColorScheme.dark(
       primary: amber,
@@ -80,7 +81,11 @@ class AppTheme {
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontFamily: nativeFontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(

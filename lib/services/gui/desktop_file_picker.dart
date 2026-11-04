@@ -9,15 +9,21 @@ class DesktopFilePicker {
 
   static Future<List<String>?> pickFiles({
     required List<String> extensions,
+    bool allowMultiple = true,
   }) async {
-    if (MobileDocuments.enabled) return MobileDocuments.pickFiles();
+    if (MobileDocuments.enabled)
+      return MobileDocuments.pickFiles(
+        extensions: extensions,
+        allowMultiple: allowMultiple,
+      );
     if (Platform.isLinux) {
       return channel.invokeListMethod<String>('pickFiles', {
         'extensions': extensions,
+        'allowMultiple': allowMultiple,
       });
     }
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+      allowMultiple: allowMultiple,
       type: FileType.custom,
       allowedExtensions: extensions,
       dialogTitle: 'Choose files to work with',

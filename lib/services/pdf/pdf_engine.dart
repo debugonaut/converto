@@ -8,8 +8,10 @@ import 'package:pdf_manipulator/io.dart';
 import 'package:pdf_manipulator/pdf_manipulator.dart';
 
 import '../../core/utils/file_utils.dart';
+import '../../models/pdf_layout_options.dart';
 import '../storage_service.dart';
 import 'page_number_bridge.dart';
+import 'pdf_extended_tools.dart';
 
 /// One bundled, entirely local PDF engine for the operations the old
 /// converter could not do on its own.
@@ -555,6 +557,7 @@ class PdfEngine {
     double opacity = 0.25,
     double angle = 45,
     double fontSize = 54,
+    PdfLayoutOptions? layout,
     String? outputPath,
     void Function(double progress)? onProgress,
   }) async {
@@ -575,6 +578,18 @@ class PdfEngine {
       targetExtension: 'pdf',
       explicitDestinationPath: outputPath,
     );
+
+    if (layout != null)
+      return PdfExtendedTools.textWatermark(
+        sourceFile: sourceFile,
+        outputPath: output.path,
+        text: text,
+        opacity: opacity,
+        angle: angle,
+        fontSize: fontSize,
+        layout: layout,
+        onProgress: onProgress,
+      );
 
     onProgress?.call(0.2);
     await _writeAtomically(output, (sink) async {
@@ -1127,6 +1142,7 @@ class PdfEngine {
   static Future<List<File>> splitBySize({
     required File sourceFile,
     required int maxBytes,
+    bool allowOversizedPages = false,
     String? outputDirectory,
     void Function(double progress)? onProgress,
   }) async {
@@ -1182,9 +1198,13 @@ class PdfEngine {
         }
 
         if (best == 0) {
-          throw ArgumentError(
-            'Page ${start + 1} cannot fit in $maxBytes bytes. Increase --size.',
-          );
+          if (allowOversizedPages) {
+            best = 1;
+          } else {
+            throw ArgumentError(
+              'Page ${start + 1} cannot fit in $maxBytes bytes. Increase --size.',
+            );
+          }
         }
 
         final output = File(
@@ -1215,6 +1235,7 @@ class PdfEngine {
   /// Writes `Page X of N` in the bottom-right corner of every page.
   static Future<File> pageNumbers({
     required File sourceFile,
+    PdfLayoutOptions? layout,
     String? outputPath,
     void Function(double progress)? onProgress,
   }) async {
@@ -1225,6 +1246,19 @@ class PdfEngine {
       targetExtension: 'pdf',
       explicitDestinationPath: outputPath,
     );
+
+    if (layout != null)
+      return PdfExtendedTools.textWatermark(
+        sourceFile: sourceFile,
+        outputPath: output.path,
+        text: '',
+        opacity: .9,
+        angle: 0,
+        fontSize: 9,
+        layout: layout,
+        numbers: true,
+        onProgress: onProgress,
+      );
 
     await withPageNumberEditor(FileSource(sourceFile), (editor) async {
       for (var index = 0; index < total; index++) {

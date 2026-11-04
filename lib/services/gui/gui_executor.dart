@@ -4,12 +4,16 @@ import 'package:path/path.dart' as p;
 import '../../core/utils/file_utils.dart';
 import '../../models/edit_options.dart';
 import '../../models/scan_options.dart';
+import '../../models/pdf_layout_options.dart';
 import '../../models/gui/tool_definition.dart';
 import '../file_operations.dart';
 import '../pdf/pdf_engine.dart';
+import '../pdf/pdf_extended_tools.dart';
+import '../converters/pdf_converter.dart';
 import '../scanned_pdf_service.dart';
 import 'output_names.dart';
 import 'pdf_page_actions.dart';
+import 'tool_capabilities.dart';
 
 class GuiRequest {
   final ToolId tool;
@@ -40,6 +44,7 @@ class GuiRequest {
 
   bool get hasCombinedOutput =>
       tool == ToolId.merge ||
+      tool == ToolId.compare ||
       (tool == ToolId.scanPdf && paths.length > 1) ||
       combinesImagesToPdf;
 }
@@ -107,6 +112,8 @@ class GuiExecutor {
         (request.tool == ToolId.scanPdf && request.paths.length > 1);
     final extension = switch (request.tool) {
       ToolId.pdfText => 'txt',
+      ToolId.compare => 'html',
+      ToolId.ocr => request.options['format'] as String? ?? 'txt',
       ToolId.convert ||
       ToolId.editImage ||
       ToolId.pdfImages ||
@@ -125,6 +132,8 @@ class GuiExecutor {
     if (request.tool == ToolId.merge && request.paths.length < 2) {
       throw ArgumentError('Choose at least two PDFs or images to merge.');
     }
+    if (request.tool == ToolId.compare && request.paths.length != 2)
+      throw ArgumentError('Choose exactly two PDFs: left first, right second.');
     for (final path in request.paths) {
       if (await FileSystemEntity.type(path, followLinks: false) !=
               FileSystemEntityType.file ||
@@ -133,6 +142,13 @@ class GuiExecutor {
       }
       inputBytes += await File(path).length();
     }
+    final capabilities = await ToolCapabilities.detect();
+    final unavailable = capabilities.check(
+      request.tool,
+      request.paths.map(FileUtils.getExtension),
+      request.options,
+    );
+    if (unavailable != null) throw ArgumentError(unavailable);
     Future<void> checkpoint() async {
       // Let queued cancellation messages run even after synchronous codecs.
       await Future<void>.delayed(Duration.zero);
@@ -183,6 +199,27 @@ class GuiExecutor {
             onProgress: (v) => onProgress?.call(v * .95, 'Merging files'),
           ),
         );
+      } else if (request.tool == ToolId.compare) {
+        final comparison = await PdfEngine.compare(
+          leftFile: File(request.paths[0]),
+          rightFile: File(request.paths[1]),
+          leftPassword: text('leftPassword').isEmpty
+              ? null
+              : text('leftPassword'),
+          rightPassword: text('rightPassword').isEmpty
+              ? null
+              : text('rightPassword'),
+          reportPath: p.join(staging.path, 'comparison.html'),
+        );
+        generated.add(comparison.report!);
+        details.add(
+          comparison.identical
+              ? 'No changes detected by the text/pixel comparison.'
+              : '${comparison.changedPages.length} changed pages. ${comparison.leftPages} left / ${comparison.rightPages} right pages.',
+        );
+        details.add(
+          'Sampled visual and text comparison; inspect the exported report for details.',
+        );
       } else {
         for (var index = 0; index < request.paths.length; index++) {
           await checkpoint();
@@ -209,6 +246,83 @@ class GuiExecutor {
           final firstNewOutput = generated.length;
           try {
             switch (request.tool) {
+              case ToolId.repair:
+                generated.add(
+                  await PdfEngine.repair(
+                    sourceFile: source,
+                    outputPath: destination(),
+                    password: text('password').isEmpty
+                        ? null
+                        : text('password'),
+                    onProgress: progress,
+                  ),
+                );
+                details.add(
+                  'Rebuilt recoverable structure. Rewriting can invalidate existing digital signatures.',
+                );
+              case ToolId.clean:
+                generated.add(
+                  await PdfExtendedTools.clean(
+                    sourceFile: source,
+                    outputPath: destination(),
+                    metadata: o['cleanMetadata'] != false,
+                    javascript: o['cleanJavascript'] != false,
+                    attachments: o['cleanAttachments'] != false,
+                    password: text('password').isEmpty
+                        ? null
+                        : text('password'),
+                  ),
+                );
+              case ToolId.flatten:
+                generated.add(
+                  await PdfExtendedTools.flatten(
+                    sourceFile: source,
+                    outputPath: destination(),
+                    forms: o['flattenForms'] != false,
+                    annotations: o['flattenAnnotations'] != false,
+                    password: text('password').isEmpty
+                        ? null
+                        : text('password'),
+                  ),
+                );
+                details.add(
+                  'Selected interactive content was flattened; this does not encrypt or lock the document.',
+                );
+              case ToolId.sign:
+                if (text('certificatePath').isEmpty)
+                  throw ArgumentError('Choose a local P12 or PFX certificate.');
+                generated.add(
+                  await PdfEngine.sign(
+                    sourceFile: source,
+                    outputPath: destination(),
+                    p12Path: text('certificatePath'),
+                    p12Password: text('certificatePassword'),
+                    reason: text('reason').isEmpty ? null : text('reason'),
+                    location: text('location').isEmpty
+                        ? null
+                        : text('location'),
+                    onProgress: progress,
+                  ),
+                );
+                details.add(
+                  'Certificate signature added. Trust depends on the certificate chain; a local or self-signed certificate does not establish a verified identity.',
+                );
+              case ToolId.ocr:
+                final searchable = text('format', 'txt') == 'pdf';
+                final result = await PdfEngine.ocr(
+                  sourceFile: source,
+                  language: text('language', 'eng'),
+                  dpi: integer('dpi', 300, min: 72, max: 600),
+                  searchablePdf: searchable,
+                  password: text('password').isEmpty ? null : text('password'),
+                  outputPath: destination('txt'),
+                  pdfOutputPath: searchable ? destination() : null,
+                  onProgress: progress,
+                );
+                generated.add(searchable ? result.pdfFile! : result.textFile);
+                details.add(
+                  '${result.pageCount} pages recognized locally; ${result.characters} characters.',
+                );
               case ToolId.scanPdf:
                 generated.add(
                   await ScannedPdfService.create(
@@ -276,6 +390,17 @@ class GuiExecutor {
                       onProgress: progress,
                     ),
                   );
+                } else if (request.tool == ToolId.convert &&
+                    FileUtils.getExtension(source.path) == 'pdf' &&
+                    target == 'html' &&
+                    o['htmlLayout'] == true) {
+                  generated.add(
+                    await PdfConverter().pdfToHtmlVisual(
+                      pdfFile: source,
+                      outputPath: destination('html'),
+                      onProgress: progress,
+                    ),
+                  );
                 } else {
                   generated.add(
                     await FileOperations.convert(
@@ -290,17 +415,54 @@ class GuiExecutor {
                   );
                 }
               case ToolId.pdfImages:
-                generated.addAll(
-                  await PdfEngine.renderPages(
+                if (text('imageMode') == 'extract') {
+                  generated.addAll(
+                    await PdfExtendedTools.extractImages(
+                      sourceFile: source,
+                      outputDirectory: folder.path,
+                      onProgress: progress,
+                      checkpoint: checkpoint,
+                    ),
+                  );
+                } else {
+                  generated.addAll(
+                    await PdfEngine.renderPages(
+                      sourceFile: source,
+                      targetFormat: target,
+                      dpi: integer('dpi', 150, min: 1),
+                      outputDirectory: folder.path,
+                      onProgress: progress,
+                    ),
+                  );
+                }
+              case ToolId.split:
+                if (text('splitMode') == 'size') {
+                  final size = decimal('maxSizeMb', 10);
+                  if (size <= 0 || size > 1024 * 1024)
+                    throw ArgumentError(
+                      'Enter a positive target size up to 1048576 MB.',
+                    );
+                  final limit = (size * 1024 * 1024).floor();
+                  if (limit < 1)
+                    throw ArgumentError(
+                      'Target size must be at least one byte.',
+                    );
+                  final parts = await PdfEngine.splitBySize(
                     sourceFile: source,
-                    targetFormat: target,
-                    dpi: integer('dpi', 150, min: 1),
+                    maxBytes: limit,
+                    allowOversizedPages: true,
                     outputDirectory: folder.path,
                     onProgress: progress,
-                  ),
-                );
-              case ToolId.split:
-                if (text('pages').trim().isNotEmpty) {
+                  );
+                  generated.addAll(parts);
+                  final oversized = parts
+                      .where((file) => file.lengthSync() > limit)
+                      .length;
+                  if (oversized > 0)
+                    details.add(
+                      '$oversized single-page parts exceed the target size and were retained.',
+                    );
+                } else if (text('pages').trim().isNotEmpty) {
                   generated.addAll(
                     await PdfEngine.splitExpression(
                       sourceFile: source,
@@ -349,23 +511,45 @@ class GuiExecutor {
                   ),
                 );
               case ToolId.watermark:
-                if (text('text').trim().isEmpty)
-                  throw ArgumentError('Enter watermark text.');
-                generated.add(
-                  await PdfEngine.watermark(
-                    sourceFile: source,
-                    text: text('text'),
-                    opacity: decimal('opacity', .25),
-                    angle: decimal('angle', 45),
-                    fontSize: decimal('fontSize', 54),
-                    outputPath: destination(),
-                    onProgress: progress,
-                  ),
-                );
+                if (text('watermarkKind') == 'image') {
+                  if (text('watermarkImage').isEmpty)
+                    throw ArgumentError(
+                      'Choose a local JPG or PNG watermark image.',
+                    );
+                  generated.add(
+                    await PdfExtendedTools.imageWatermark(
+                      sourceFile: source,
+                      imageFile: File(text('watermarkImage')),
+                      outputPath: destination(),
+                      opacity: decimal('opacity', .25),
+                      layout: PdfLayoutOptions.fromMap(o),
+                      onProgress: progress,
+                    ),
+                  );
+                } else {
+                  if (text('text').trim().isEmpty)
+                    throw ArgumentError('Enter watermark text.');
+                  generated.add(
+                    await PdfEngine.watermark(
+                      sourceFile: source,
+                      text: text('text'),
+                      opacity: decimal('opacity', .25),
+                      angle: decimal('angle', 45),
+                      fontSize: decimal('fontSize', 54),
+                      layout: PdfLayoutOptions.fromMap(o),
+                      outputPath: destination(),
+                      onProgress: progress,
+                    ),
+                  );
+                }
               case ToolId.pageNumbers:
                 generated.add(
                   await PdfEngine.pageNumbers(
                     sourceFile: source,
+                    layout: PdfLayoutOptions.fromMap({
+                      'position': 'bottomRight',
+                      ...o,
+                    }),
                     outputPath: destination(),
                     onProgress: progress,
                   ),
@@ -446,6 +630,7 @@ class GuiExecutor {
                   'First page: ${info.firstPageWidth.toStringAsFixed(1)} × ${info.firstPageHeight.toStringAsFixed(1)} pt',
                 );
               case ToolId.merge:
+              case ToolId.compare:
                 throw StateError('Merge is executed as one ordered batch.');
             }
           } on GuiCancelled {

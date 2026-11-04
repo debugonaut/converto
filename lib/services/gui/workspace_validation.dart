@@ -1,6 +1,7 @@
 import '../../models/gui/tool_definition.dart';
 import '../../models/gui/file_preview.dart';
 import '../../models/scan_options.dart';
+import '../../models/pdf_layout_options.dart';
 import '../pdf/pdf_engine.dart';
 
 class WorkspaceValidation {
@@ -45,15 +46,57 @@ class WorkspaceValidation {
       return value;
     }
 
-    if ([ToolId.watermark, ToolId.redact].contains(tool) &&
+    if ((tool == ToolId.redact ||
+            (tool == ToolId.watermark && text('watermarkKind') != 'image')) &&
         text('text').isEmpty)
       errors['text'] = tool == ToolId.watermark
           ? 'Enter watermark text.'
           : 'Enter the text to redact.';
     if (tool == ToolId.watermark) {
       decimal('opacity', minimum: 0, maximum: 1);
-      decimal('angle');
-      decimal('fontSize', minimum: .1);
+      if (text('watermarkKind') == 'image') {
+        if (text('watermarkImage').isEmpty)
+          errors['watermarkImage'] =
+              'Choose a local JPG or PNG watermark image.';
+      } else {
+        decimal('angle');
+        decimal('fontSize', minimum: .1);
+      }
+    }
+    if ([ToolId.watermark, ToolId.pageNumbers].contains(tool)) {
+      try {
+        PdfLayoutOptions.fromMap(options);
+      } on ArgumentError catch (error) {
+        errors['layout'] = '${error.message}';
+      }
+      if (text('pages').isNotEmpty && preview?.kind == 'pdf') {
+        try {
+          PdfEngine.parsePageList(text('pages'), preview!.pageCount);
+        } on ArgumentError catch (error) {
+          errors['pages'] = '${error.message}';
+        } on FormatException catch (error) {
+          errors['pages'] = error.message;
+        }
+      }
+    }
+    if (tool == ToolId.sign && text('certificatePath').isEmpty)
+      errors['certificatePath'] = 'Choose a local P12 or PFX certificate.';
+    if (tool == ToolId.flatten &&
+        options['flattenForms'] == false &&
+        options['flattenAnnotations'] == false)
+      errors['flatten'] = 'Choose forms, annotations or both.';
+    if (tool == ToolId.clean &&
+        options['cleanMetadata'] == false &&
+        options['cleanJavascript'] == false &&
+        options['cleanAttachments'] == false)
+      errors['clean'] = 'Choose at least one kind of content to remove.';
+    if (tool == ToolId.ocr) {
+      integer('dpi', minimum: 72, maximum: 600);
+      if (!RegExp(
+        r'^[a-zA-Z0-9_]+(?:\+[a-zA-Z0-9_]+)*$',
+      ).hasMatch(text('language')))
+        errors['language'] =
+            'Enter installed language codes, for example eng or eng+hin.';
     }
     if ([ToolId.protect, ToolId.unlock].contains(tool) &&
         text('password').isEmpty)
@@ -63,17 +106,27 @@ class WorkspaceValidation {
     if ([ToolId.extract, ToolId.organize].contains(tool) &&
         text('pages').isEmpty)
       errors['pages'] = 'Select at least one page.';
-    if ([ToolId.extract, ToolId.organize, ToolId.split].contains(tool) &&
+    if (([ToolId.extract, ToolId.organize].contains(tool) ||
+            (tool == ToolId.split &&
+                !['count', 'size'].contains(text('splitMode')))) &&
         text('pages').isNotEmpty &&
         preview?.kind == 'pdf') {
       try {
         PdfEngine.parsePageGroups(text('pages'), preview!.pageCount);
       } on ArgumentError catch (error) {
         errors['pages'] = '${error.message}';
+      } on FormatException catch (error) {
+        errors['pages'] = error.message;
       }
     }
-    if (tool == ToolId.split && text('pages').isEmpty) integer('every');
-    if (tool == ToolId.pdfImages) integer('dpi');
+    if (tool == ToolId.split) {
+      if (text('splitMode') == 'size')
+        decimal('maxSizeMb', minimum: .000001, maximum: 1048576);
+      else if (text('pages').isEmpty)
+        integer('every');
+    }
+    if (tool == ToolId.pdfImages && text('imageMode') != 'extract')
+      integer('dpi');
     if (tool == ToolId.crop) {
       final margins = [
         'left',

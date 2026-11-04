@@ -23,9 +23,10 @@ The CLI has **25 operations**, **21 registered source extensions**, and **114 te
 
 ## macOS app preview
 
-The native Flutter app offers **20 file tools**: conversion, image editing, scanned PDF creation, PDF
+The native Flutter app offers **26 file tools**: conversion, image editing, scanned PDF creation, PDF
 merge/split/extract/organize, page rotation/crop/numbers/watermark, compression,
-redaction, encryption/unlock, PDF/A, Office export, text extraction and metadata.
+redaction, encryption/unlock, PDF/A, Office export, text extraction and metadata,
+plus comparison, repair, cleanup, certificate signing, OCR and flattening.
 Search or filter the tool catalog, add files with Finder drag and drop or the
 native picker, then explicitly run a tool. Drops never start processing.
 
@@ -73,7 +74,7 @@ separate from GUI and native-window validation. See the [Mac app audit](docs/aud
 
 ## Windows and Linux app previews
 
-Both desktop apps share the Mac app's **20 tools**, previews, output naming,
+Both desktop apps share the Mac app's tool catalog, previews, output naming,
 transactional saves and explicit Run workflow. No accounts, telemetry, runtime
 codec downloads or processing quotas are added. Native manual file-manager,
 dialog, display-scaling and drag/drop checks remain separate from automated tests.
@@ -107,6 +108,13 @@ their documented requirements. See the [Linux audit](docs/audit/2026-11-01-linux
 and [Windows audit](docs/audit/2026-11-01-windows-app.md).
 
 ## Android app preview
+
+The 1.2.0 catalog includes PDF comparison with an exportable HTML report, repair,
+cleanup, local certificate signing and flattening. Split PDF can target a file
+size, and PDF to images can extract embedded JPEG/PNG objects. Watermarks can use
+text or a local image, and watermark and page-number options include page ranges
+and placement. OCR uses an installed Tesseract engine on desktop. The Android
+and native iOS workspaces show its mobile availability before processing.
 
 The Android preview reuses the Flutter tool catalog and local conversion engine,
 with phone navigation, app-private results, and native document import/export.

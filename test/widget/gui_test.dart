@@ -162,6 +162,9 @@ void main() {
                 ToolId.extract,
                 ToolId.crop,
                 ToolId.unlock,
+                ToolId.compare,
+                ToolId.sign,
+                ToolId.ocr,
               ].contains(tool.id)
               ? isNull
               : isNotNull,

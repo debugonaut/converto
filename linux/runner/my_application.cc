@@ -84,7 +84,12 @@ static void files_method_call(FlMethodChannel* channel, FlMethodCall* call,
   gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
   GtkFileChooser* chooser = GTK_FILE_CHOOSER(dialog);
   gtk_file_chooser_set_local_only(chooser, TRUE);
-  gtk_file_chooser_set_select_multiple(chooser, !directory);
+  FlValue* picker_args = fl_method_call_get_args(call);
+  FlValue* multiple = picker_args && fl_value_get_type(picker_args) == FL_VALUE_TYPE_MAP
+      ? fl_value_lookup_string(picker_args, "allowMultiple") : nullptr;
+  const bool allow_multiple = !multiple || fl_value_get_type(multiple) != FL_VALUE_TYPE_BOOL
+      || fl_value_get_bool(multiple);
+  gtk_file_chooser_set_select_multiple(chooser, !directory && allow_multiple);
   if (!directory) {
     GtkFileFilter* filter = gtk_file_filter_new();
     gtk_file_filter_set_name(filter, "Supported files");

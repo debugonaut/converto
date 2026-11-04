@@ -15,11 +15,15 @@ import 'package:pdf_manipulator/src/types/cancel_hook.dart';
 
 Future<T> withPageNumberEditor<T>(
   DataSource source,
-  Future<T> Function(BridgeEditorHandle editor) action,
-) async {
+  Future<T> Function(BridgeEditorHandle editor) action, {
+  List<double> Function()? positionFields,
+}) async {
   final host = createLaneHost();
   final bridge = SharedBridge(
-    _CornerTransport(Router(host: host, maxLanes: 1, mode: host.mode)),
+    _CornerTransport(
+      Router(host: host, maxLanes: 1, mode: host.mode),
+      positionFields,
+    ),
   );
   try {
     final editor = await bridge.openEditor(source);
@@ -34,8 +38,9 @@ Future<T> withPageNumberEditor<T>(
 }
 
 class _CornerTransport implements PdfTransport {
-  _CornerTransport(this.delegate);
+  _CornerTransport(this.delegate, this.positionFields);
   final PdfTransport delegate;
+  final List<double> Function()? positionFields;
 
   @override
   Future<({Uint8List bytes, Map<int, int> resourceIds})> execute(
@@ -49,7 +54,7 @@ class _CornerTransport implements PdfTransport {
     // (open/save/dispose) pass through unchanged, retaining streaming I/O.
     if (peekRequestOp(request) == 'editorMutate') {
       final field = wire.encodeRequest('', {
-        'posFields': <double>[3, 24, 20],
+        'posFields': positionFields?.call() ?? <double>[3, 24, 20],
       });
       final corrected = Uint8List(request.length + field.length - 3)
         ..setRange(0, request.length, request)

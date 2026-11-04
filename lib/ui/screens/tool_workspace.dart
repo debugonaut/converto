@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../../core/theme/app_theme.dart';
@@ -10,6 +11,9 @@ import '../../services/gui/local_preview_service.dart';
 import '../../services/gui/mobile_documents.dart';
 import '../../services/gui/output_names.dart';
 import '../../services/gui/workspace_validation.dart';
+import '../../services/pdf/pdf_engine.dart';
+import '../../services/gui/tool_capabilities.dart';
+import '../../services/gui/secondary_file_picker.dart';
 import '../widgets/file_preview_view.dart';
 import '../widgets/output_name_field.dart';
 import '../widgets/workspace_file_list.dart';
@@ -18,6 +22,8 @@ import '../widgets/pdf_page_controls.dart';
 import '../widgets/crop_overlay.dart';
 import '../widgets/image_edit_preview.dart';
 import '../widgets/scan_preview.dart';
+import '../widgets/extended_pdf_options.dart';
+import '../widgets/pdf_stamp_preview.dart';
 import '../../models/gui/tool_definition.dart';
 import '../../services/gui/gui_executor.dart';
 import '../../services/gui/gui_job_controller.dart';
@@ -32,6 +38,8 @@ class ToolWorkspace extends StatefulWidget {
   final bool addingFiles;
   final int intakeRevision;
   final LocalPreviewService? previews;
+  final ToolCapabilities? capabilities;
+  final Future<PickedLocalFile?> Function(List<String>)? secondaryPicker;
   final void Function(ToolDefinition, List<String>)? onUseResults;
   final VoidCallback onBack;
   final Future<void> Function() onPick;
@@ -48,6 +56,8 @@ class ToolWorkspace extends StatefulWidget {
     this.addingFiles = false,
     this.intakeRevision = 0,
     this.previews,
+    this.capabilities,
+    this.secondaryPicker,
     this.onUseResults,
     required this.onBack,
     required this.onPick,
@@ -73,21 +83,116 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   String? _activePath;
   bool _resetting = false;
   int _previewRevision = 0;
+  ToolCapabilities? _capabilities;
+  final _secondary = <String, PickedLocalFile>{};
+  bool _pickingSecondary = false;
   int get _reloadToken => _previewRevision + widget.intakeRevision;
 
   @override
   void initState() {
     super.initState();
     _previews = widget.previews ?? LocalPreviewService();
+    _capabilities = widget.capabilities;
+    if (_capabilities == null) unawaited(_loadCapabilities());
     _activePath = widget.paths.firstOrNull;
     _combinedName = TextEditingController(
       text: _id == ToolId.merge
           ? 'merged'
+          : _id == ToolId.compare
+          ? 'comparison'
           : _id == ToolId.scanPdf
           ? 'scanned'
           : 'combined',
     )..addListener(_formChanged);
     widget.job.addListener(_jobChanged);
+  }
+
+  Future<void> _loadCapabilities() async {
+    final result = await ToolCapabilities.detect(
+      mobile: MobileDocuments.enabled,
+    );
+    if (mounted) setState(() => _capabilities = result);
+  }
+
+  String? get _capabilityReason {
+    final capabilities =
+        _capabilities ??
+        (MobileDocuments.enabled
+            ? const ToolCapabilities(
+                mobile: true,
+                libreOffice: false,
+                webp: false,
+                tesseract: false,
+              )
+            : null);
+    if (capabilities == null) {
+      const bundled = ToolCapabilities(
+        mobile: false,
+        libreOffice: false,
+        webp: false,
+        tesseract: false,
+      );
+      return bundled.check(_id, widget.paths.map(FileUtils.getExtension), {
+                ..._optionsMap,
+                'format': _format,
+              }) ==
+              null
+          ? null
+          : 'Checking the installed local capability…';
+    }
+    return capabilities.check(_id, widget.paths.map(FileUtils.getExtension), {
+      ..._optionsMap,
+      'format': _format,
+    });
+  }
+
+  Future<void> _releaseSecondary(String key) async {
+    final selection = _secondary.remove(key);
+    try {
+      await selection?.release();
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The temporary imported copy could not be removed.'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _pickSecondary(String key, List<String> extensions) async {
+    if (_filesLocked || _pickingSecondary) return;
+    setState(() => _pickingSecondary = true);
+    try {
+      final picked = await (widget.secondaryPicker ?? SecondaryFilePicker.pick)(
+        extensions,
+      );
+      if (!mounted) {
+        await picked?.release();
+        return;
+      }
+      if (picked == null) return;
+      await _releaseSecondary(key);
+      if (!mounted) {
+        await picked.release();
+        return;
+      }
+      setState(() {
+        _secondary[key] = picked;
+        _values[key] = picked.path;
+      });
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Choose one local ${extensions.join(' or ').toUpperCase()} file.',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _pickingSecondary = false);
+    }
   }
 
   void _jobChanged() {
@@ -127,6 +232,11 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
       ToolId.redact => 'redacted',
       ToolId.pdfa => 'archival',
       ToolId.unlock => 'unlocked',
+      ToolId.repair => 'repaired',
+      ToolId.clean => 'cleaned',
+      ToolId.sign => 'signed',
+      ToolId.flatten => 'flattened',
+      ToolId.ocr => 'ocr',
       ToolId.split => 'part',
       _ => '',
     };
@@ -135,6 +245,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
 
   String get _extension => _id == ToolId.pdfText
       ? 'txt'
+      : _id == ToolId.compare
+      ? 'html'
+      : _id == ToolId.ocr
+      ? _format
+      : _id == ToolId.pdfImages && _values['imageMode'] == 'extract'
+      ? 'jpg / png'
       : [
           ToolId.convert,
           ToolId.editImage,
@@ -146,7 +262,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   Map<String, Object> get _optionsMap => {
     'quality': '85',
     'every': '1',
-    'dpi': '150',
+    'dpi': _id == ToolId.ocr ? '300' : '150',
+    'language': 'eng',
+    'startNumber': '1',
+    'margin': '20',
+    'imageWidthPercent': '25',
+    'maxSizeMb': '10',
     'opacity': '0.25',
     'angle': '45',
     'fontSize': '54',
@@ -202,6 +323,9 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   }
 
   void _resetOptions() {
+    for (final key in _secondary.keys.toList()) {
+      unawaited(_releaseSecondary(key));
+    }
     _resetting = true;
     for (final controller in _fields.values) {
       controller.dispose();
@@ -223,7 +347,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
 
   ToolId get _id => widget.tool.id;
   bool get _busy => widget.job.busy;
-  bool get _filesLocked => _busy || widget.addingFiles;
+  bool get _filesLocked => _busy || widget.addingFiles || _pickingSecondary;
   bool get _canCombineImagesToPdf => widget.tool.canCombineImagesToPdf(
     widget.paths.map(FileUtils.getExtension),
     _format,
@@ -232,6 +356,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
       _canCombineImagesToPdf && _values['pdfOutput'] != 'separate';
   bool get _combinedOutput =>
       _id == ToolId.merge ||
+      _id == ToolId.compare ||
       _combineImages ||
       (_id == ToolId.scanPdf && widget.paths.length > 1);
 
@@ -252,6 +377,8 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   @override
   void didUpdateWidget(covariant ToolWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.capabilities != oldWidget.capabilities)
+      _capabilities = widget.capabilities;
     if (!_targets.contains(_format)) _values.remove('format');
     if (!widget.paths.contains(_activePath))
       _activePath = widget.paths.firstOrNull;
@@ -270,6 +397,10 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
 
   @override
   void dispose() {
+    for (final selection in _secondary.values) {
+      unawaited(selection.release().catchError((_) {}));
+    }
+    _secondary.clear();
     for (final controller in _fields.values) {
       controller.dispose();
     }
@@ -299,7 +430,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     padding: const EdgeInsets.only(bottom: 18),
     child: TextField(
       controller: _controller(name, initial),
-      enabled: !_busy,
+      enabled: !_filesLocked,
       obscureText: secret,
       autocorrect: !secret,
       enableSuggestions: !secret,
@@ -340,23 +471,27 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                 DropdownMenuItem(value: entry.key, child: Text(entry.value)),
           )
           .toList(),
-      onChanged: _busy
+      onChanged: _filesLocked
           ? null
           : (value) => setState(() => _values[name] = value!),
     ),
   );
   Future<void> _run() async {
     if (widget.outputDirectory == null ||
-        widget.addingFiles ||
+        _filesLocked ||
         _errors.isNotEmpty ||
         !_namesValid)
       return;
+    if (_id == ToolId.compare && widget.paths.length != 2) return;
+    if (_capabilityReason != null) return;
     FocusScope.of(context).unfocus();
     final options = <String, Object>{..._values};
     for (final entry in _fields.entries) {
       options[entry.key] = entry.value.text;
     }
     options['format'] = _format;
+    if (_id == ToolId.split && options['splitMode'] == 'count')
+      options.remove('pages');
     if (_id == ToolId.protect &&
         options['password'] != options['confirmPassword']) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -385,10 +520,18 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
       ),
       remember: widget.remember,
     );
-    for (final key in ['password', 'confirmPassword']) {
+    for (final key in [
+      'password',
+      'confirmPassword',
+      'certificatePassword',
+      'leftPassword',
+      'rightPassword',
+    ]) {
       _fields[key]?.clear();
       _values.remove(key);
     }
+    _values.remove('certificatePath');
+    await _releaseSecondary('certificatePath');
     if (mounted) {
       setState(() {});
       if (widget.job.result != null)
@@ -410,11 +553,13 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         .length;
     final errors = _errors;
     final valid =
-        !widget.addingFiles &&
+        !_filesLocked &&
         widget.paths.isNotEmpty &&
         incompatible == 0 &&
         _targets.isNotEmpty &&
         (_id != ToolId.merge || widget.paths.length >= 2) &&
+        (_id != ToolId.compare || widget.paths.length == 2) &&
+        _capabilityReason == null &&
         widget.outputDirectory != null &&
         errors.isEmpty &&
         _namesValid;
@@ -470,9 +615,30 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                       style: const TextStyle(color: AppTheme.muted),
                     ),
                     const SizedBox(height: 22),
+                    if (_capabilityReason case final String reason)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: Text(
+                          reason,
+                          style: const TextStyle(color: AppTheme.amber),
+                        ),
+                      ),
                     LayoutBuilder(
                       builder: (context, box) {
-                        final files = _files(incompatible);
+                        final deferPreview =
+                            box.maxWidth < 820 &&
+                            [
+                              ToolId.compare,
+                              ToolId.repair,
+                              ToolId.clean,
+                              ToolId.sign,
+                              ToolId.ocr,
+                              ToolId.flatten,
+                            ].contains(_id);
+                        final files = _files(
+                          incompatible,
+                          showPreview: !deferPreview,
+                        );
                         final options = _id == ToolId.merge
                             ? (_activePath == null
                                   ? const SizedBox.shrink()
@@ -517,6 +683,11 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                               files,
                               const SizedBox(height: 25),
                               options,
+                              if (deferPreview && _activePath != null)
+                                _sourcePreview(
+                                  _activePath!,
+                                  _metadata[_activePath],
+                                ),
                             ],
                           );
                         return Row(
@@ -675,9 +846,12 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
                     ),
                   ),
                 ),
-                TextButton(
-                  onPressed: _busy ? null : widget.onChooseOutput,
-                  child: const Text('Change folder'),
+                Flexible(
+                  flex: MediaQuery.textScalerOf(context).scale(14) > 20 ? 2 : 0,
+                  child: TextButton(
+                    onPressed: _busy ? null : widget.onChooseOutput,
+                    child: const Text('Change folder'),
+                  ),
                 ),
               ],
             );
@@ -729,7 +903,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
     },
   );
 
-  Widget _files(int incompatible) {
+  Widget _files(int incompatible, {bool showPreview = true}) {
     final active = _activePath;
     final meta = _metadata[active];
     return Column(
@@ -826,7 +1000,8 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
               style: TextStyle(fontSize: 12, color: AppTheme.muted),
             ),
           ),
-        if (active != null && _id != ToolId.merge) _sourcePreview(active, meta),
+        if (showPreview && active != null && _id != ToolId.merge)
+          _sourcePreview(active, meta),
       ],
     );
   }
@@ -925,6 +1100,25 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
   );
 
   Widget _editPreview(FilePreview data, Widget image) {
+    if (_id == ToolId.watermark &&
+        data.kind == 'pdf' &&
+        _errors.isEmpty &&
+        (_values['watermarkKind'] == 'image'
+            ? _values['watermarkImage'] != null
+            : (_fields['text']?.text.isNotEmpty ?? false))) {
+      final scope = _fields['pages']?.text.trim() ?? '';
+      if (scope.isNotEmpty &&
+          !PdfEngine.parsePageList(scope, data.pageCount).contains(data.page))
+        return image;
+      return PdfStampPreview(
+        key: ValueKey('stamp-${data.path}'),
+        source: data.path,
+        page: data.page,
+        options: _optionsMap,
+        original: image,
+        enabled: !_busy,
+      );
+    }
     if (_id == ToolId.scanPdf && !_showScanOriginal) {
       return ScanPreview(
         image: data.image!,
@@ -1050,12 +1244,22 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
         padding: EdgeInsets.only(bottom: 22, top: 12),
         child: Text('Options', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
+      ExtendedPdfOptions(
+        tool: _id,
+        options: {..._optionsMap, 'format': _format},
+        field: _field,
+        choice: _choice,
+        onToggle: (name, value) => setState(() => _values[name] = value),
+        onPick: _pickSecondary,
+        locked: _filesLocked,
+      ),
       if ([
-        ToolId.convert,
-        ToolId.editImage,
-        ToolId.pdfOffice,
-        ToolId.pdfImages,
-      ].contains(_id))
+            ToolId.convert,
+            ToolId.editImage,
+            ToolId.pdfOffice,
+            ToolId.pdfImages,
+          ].contains(_id) &&
+          !(_id == ToolId.pdfImages && _values['imageMode'] == 'extract'))
         if (_targets.isNotEmpty)
           _choice('format', 'Output format', {
             for (final target in _targets) target: target.toUpperCase(),
@@ -1081,7 +1285,7 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
             'PDF → image exports all pages. Some Office formats and WebP output require an optional local helper.',
             style: TextStyle(color: AppTheme.muted, fontSize: 12),
           ),
-      if (_id == ToolId.pdfImages)
+      if (_id == ToolId.pdfImages && _values['imageMode'] != 'extract')
         _field('dpi', 'Resolution (DPI)', initial: '150'),
       if (_id == ToolId.scanPdf) ...[
         _choice('scanMode', 'Scan appearance', {
@@ -1123,16 +1327,6 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
           style: TextStyle(color: AppTheme.muted, fontSize: 12),
         ),
       ],
-      if (_id == ToolId.split) ...[
-        _field('every', 'Pages per part', initial: '1'),
-        _field(
-          'pages',
-          'Or split by ranges',
-          hint: '1-3, 4-6, 7',
-          help:
-              'Each comma-separated group becomes a PDF. Ranges override pages per part.',
-        ),
-      ],
       if (_id == ToolId.extract || _id == ToolId.organize)
         _field(
           'pages',
@@ -1149,12 +1343,6 @@ class _ToolWorkspaceState extends State<ToolWorkspace> {
           '180': '180°',
           '270': '270° clockwise',
         }, _id == ToolId.editImage ? '0' : '90'),
-      if (_id == ToolId.watermark) ...[
-        _field('text', 'Watermark text', hint: 'DRAFT'),
-        _field('opacity', 'Opacity (0–1)', initial: '0.25'),
-        _field('angle', 'Angle (degrees)', initial: '45'),
-        _field('fontSize', 'Font size (pt)', initial: '54'),
-      ],
       if (_id == ToolId.crop) ...[
         const Padding(
           padding: EdgeInsets.only(bottom: 18),

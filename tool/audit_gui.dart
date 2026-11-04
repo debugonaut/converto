@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:converto/models/gui/tool_definition.dart';
 import 'package:converto/services/gui/gui_executor.dart';
 import 'package:converto/services/pdf/pdf_engine.dart';
+import 'audit_extended_gui.dart';
 
 /// Real engine acceptance suite for the exact executor used by GUI isolates.
 /// No Flutter UI/native display is required. Keeps machine-readable analytics.
@@ -89,7 +90,7 @@ Future<void> main() async {
   );
   String? protected;
   try {
-    for (final id in ToolId.values) {
+    for (final id in ToolId.values.where((id) => !extendedTools.contains(id))) {
       final options = <String, Object>{};
       List<String>? paths;
       switch (id) {
@@ -313,6 +314,7 @@ Future<void> main() async {
       ),
       expectedFailure: true,
     );
+    rows.addAll(await auditExtendedGui(root));
     check(
       Directory(cancelledOutput).listSync().isEmpty,
       'Cancellation leaked output',
@@ -380,8 +382,11 @@ Future<void> main() async {
     ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(rows));
   }
   final failures = rows.where((row) => row['status'] == 'fail').length;
+  final unavailable = rows
+      .where((row) => row['status'] == 'unavailable')
+      .length;
   stdout.writeln(
-    '${rows.length - failures}/${rows.length} GUI executor checks passed.',
+    '${rows.length - failures - unavailable}/${rows.length - unavailable} GUI executor checks passed. $unavailable unavailable.',
   );
   if (failures > 0) exitCode = 1;
 }

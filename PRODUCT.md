@@ -4,7 +4,9 @@
 
 ## Platform
 
-Desktop (macOS, Windows, Linux), Android, and a native CLI. The landing page is a separate static surface.
+adaptive
+
+Native Flutter apps for desktop (macOS, Windows, Linux), Android and an iOS preview; a separate CLI and fee-free Scriptable iOS prototype. The landing page is a separate static surface.
 
 ## Stack
 

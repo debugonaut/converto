@@ -22,4 +22,10 @@ IconData toolIcon(ToolId id) => switch (id) {
   ToolId.unlock => Icons.lock_open_rounded,
   ToolId.info => Icons.info_outline_rounded,
   ToolId.scanPdf => Icons.document_scanner_outlined,
+  ToolId.compare => Icons.compare_outlined,
+  ToolId.repair => Icons.build_outlined,
+  ToolId.clean => Icons.cleaning_services_outlined,
+  ToolId.sign => Icons.verified_user_outlined,
+  ToolId.ocr => Icons.text_snippet_outlined,
+  ToolId.flatten => Icons.layers_clear_outlined,
 };

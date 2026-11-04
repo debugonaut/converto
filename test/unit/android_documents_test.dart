@@ -88,4 +88,30 @@ void main() {
       expect(await MobileDocuments.pickFiles(), paths);
     },
   );
+  test(
+    'secondary selection requests one file and releases only its imported copy',
+    () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(MobileDocuments.channel, (call) async {
+        calls.add(call);
+        return call.method == 'pickFiles'
+            ? ['/cache/imports/one/key.p12']
+            : null;
+      });
+      expect(
+        await MobileDocuments.pickFiles(
+          extensions: ['p12', 'pfx'],
+          allowMultiple: false,
+        ),
+        ['/cache/imports/one/key.p12'],
+      );
+      await MobileDocuments.releaseImport('/cache/imports/one/key.p12');
+      expect(calls[0].arguments, {
+        'extensions': ['p12', 'pfx'],
+        'allowMultiple': false,
+      });
+      expect(calls[1].method, 'releaseImport');
+      expect(calls[1].arguments, {'path': '/cache/imports/one/key.p12'});
+    },
+  );
 }

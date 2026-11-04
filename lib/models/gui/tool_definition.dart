@@ -21,6 +21,12 @@ enum ToolId {
   unlock,
   info,
   scanPdf,
+  compare,
+  repair,
+  clean,
+  sign,
+  ocr,
+  flatten,
 }
 
 enum ToolCategory { all, convert, organize, edit, optimize, security }
@@ -48,6 +54,8 @@ class ToolDefinition {
     if (id == ToolId.pdfImages) return ['png', 'jpg'];
     if (id == ToolId.pdfOffice) return ['docx', 'xlsx', 'pptx'];
     if (id == ToolId.pdfText) return ['txt'];
+    if (id == ToolId.compare) return ['html'];
+    if (id == ToolId.ocr) return ['txt', 'pdf'];
     if (id != ToolId.convert && id != ToolId.editImage) return ['pdf'];
     Set<String>? shared;
     for (final ext in extensions.toSet()) {
@@ -114,7 +122,7 @@ class ToolDefinition {
     ToolDefinition(
       ToolId.watermark,
       'Watermark',
-      'Add a text watermark to every page.',
+      'Add text or an image watermark to selected pages.',
       ToolCategory.edit,
     ),
     ToolDefinition(
@@ -162,7 +170,7 @@ class ToolDefinition {
     ToolDefinition(
       ToolId.pageNumbers,
       'Page numbers',
-      'Add Page X of N to each PDF page.',
+      'Number selected pages with a starting number and position.',
       ToolCategory.edit,
     ),
     ToolDefinition(
@@ -188,6 +196,42 @@ class ToolDefinition {
       'PDF info',
       'Inspect pages, metadata and encryption.',
       ToolCategory.organize,
+    ),
+    ToolDefinition(
+      ToolId.compare,
+      'Compare PDFs',
+      'Compare two PDFs and export a local visual report.',
+      ToolCategory.organize,
+    ),
+    ToolDefinition(
+      ToolId.repair,
+      'Repair PDF',
+      'Rebuild a recoverable PDF into a new file.',
+      ToolCategory.optimize,
+    ),
+    ToolDefinition(
+      ToolId.clean,
+      'Clean PDF',
+      'Remove metadata, scripts or embedded files.',
+      ToolCategory.security,
+    ),
+    ToolDefinition(
+      ToolId.sign,
+      'Certificate signing',
+      'Sign a PDF with your local P12 or PFX certificate.',
+      ToolCategory.security,
+    ),
+    ToolDefinition(
+      ToolId.ocr,
+      'OCR PDF',
+      'Recognize scans with an installed desktop OCR engine.',
+      ToolCategory.convert,
+    ),
+    ToolDefinition(
+      ToolId.flatten,
+      'Flatten PDF',
+      'Bake forms and annotations into page content.',
+      ToolCategory.edit,
     ),
   ];
 

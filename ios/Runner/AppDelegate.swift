@@ -58,8 +58,19 @@ private final class IOSDocuments: NSObject, UIDocumentPickerDelegate,
         result(["data": data.path, "output": results.path])
       case "pickFiles":
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: false)
-        picker.allowsMultipleSelection = true
+        let options = call.arguments as? [String: Any]
+        picker.allowsMultipleSelection = options?["allowMultiple"] as? Bool ?? true
         try present(picker, purpose: "import", result: result)
+      case "releaseImport":
+        guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else { throw documentError("Choose an imported file.") }
+        let file = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+        guard file.path.hasPrefix(imports.resolvingSymlinksInPath().standardizedFileURL.path + "/") else { throw documentError("Only imported temporary copies can be removed.") }
+        if manager.fileExists(atPath: file.path) {
+          let values = try file.resourceValues(forKeys: [.isRegularFileKey])
+          guard values.isRegularFile == true else { throw documentError("Only imported regular files can be removed.") }
+          try manager.removeItem(at: file)
+        }
+        result(nil)
       case "exportFile":
         let file = try privateFile(call, allowImport: false)
         let picker = UIDocumentPickerViewController(forExporting: [file], asCopy: true)

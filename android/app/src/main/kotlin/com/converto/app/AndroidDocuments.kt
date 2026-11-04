@@ -37,10 +37,17 @@ class AndroidDocuments(private val activity: Activity) : MethodChannel.MethodCal
                     launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "*/*"
-                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, call.argument<Boolean>("allowMultiple") != false)
                         putExtra(Intent.EXTRA_LOCAL_ONLY, true)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }, IMPORT)
+                }
+                "releaseImport" -> {
+                    val path = requireNotNull(call.argument<String>("path")) { "Choose an imported file." }
+                    val file = File(path).canonicalFile
+                    require(file.path.startsWith(File(activity.cacheDir, "imports").canonicalPath + File.separator)) { "Only imported temporary copies can be removed." }
+                    require(!file.exists() || (file.isFile && file.delete())) { "Could not remove the temporary imported copy." }
+                    result.success(null)
                 }
                 "exportFile" -> {
                     val source = resultFile(call.argument<String>("path"))

@@ -23,8 +23,16 @@ class MobileDocuments {
     AppPaths.configureMobile(data: data, output: output);
   }
 
-  static Future<List<String>?> pickFiles() =>
-      channel.invokeListMethod<String>('pickFiles');
+  static Future<List<String>?> pickFiles({
+    List<String> extensions = const [],
+    bool allowMultiple = true,
+  }) => channel.invokeListMethod<String>('pickFiles', {
+    'extensions': extensions,
+    'allowMultiple': allowMultiple,
+  });
+
+  static Future<void> releaseImport(String path) =>
+      channel.invokeMethod<void>('releaseImport', {'path': path});
 
   /// False means that the user cancelled the system Save dialog.
   static Future<bool> exportFile(String path) async =>
