@@ -89,13 +89,24 @@ void main() {
     ]);
     expect(calls.first.arguments, {
       'extensions': ['pdf'],
+      'allowMultiple': true,
     });
     expect(
       await DesktopFilePicker.pickDirectory(),
       '/home/person/Output with spaces',
     );
     cancel = true;
-    expect(await DesktopFilePicker.pickFiles(extensions: ['pdf']), isNull);
+    expect(
+      await DesktopFilePicker.pickFiles(
+        extensions: ['pdf'],
+        allowMultiple: false,
+      ),
+      isNull,
+    );
+    expect(calls.last.arguments, {
+      'extensions': ['pdf'],
+      'allowMultiple': false,
+    });
     expect(await DesktopFilePicker.pickDirectory(), isNull);
   }, skip: !Platform.isLinux);
 }
